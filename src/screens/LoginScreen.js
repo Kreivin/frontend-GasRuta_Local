@@ -47,7 +47,7 @@ export default function LoginScreen({ navigation }) {
 
           <TouchableOpacity
             style={styles.button}
-            onPress={() => navigation.navigate("Home")}
+            onPress={() => navigation.replace("MainTabs")}
           >
             <Text style={styles.buttonText}>
               Entrar

@@ -8,41 +8,16 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { CartContext } from "../context/CartContext";
+import { ProductContext } from "../context/ProductContext";
 
 export default function HomeScreen({ navigation }) {
   const { cart, addToCart } = useContext(CartContext);
+  const { products } = useContext(ProductContext);
 
   const totalItems = cart.reduce(
     (sum, item) => sum + item.qty,
     0
   );
-
-  const products = [
-    {
-      id: 1,
-      name: "5 kg — Pequeño",
-      price: 200,
-      tag: "Ideal hogar",
-    },
-    {
-      id: 2,
-      name: "10 kg — Mediano",
-      price: 480,
-      tag: "Más vendido",
-    },
-    {
-      id: 3,
-      name: "15 kg — Grande",
-      price: 2004,
-      tag: "",
-    },
-    {
-      id: 4,
-      name: "45 kg — Industrial",
-      price: 4000,
-      tag: "Empresas",
-    },
-  ];
 
   return (
     <View style={styles.container}>
@@ -113,7 +88,7 @@ export default function HomeScreen({ navigation }) {
             </Text>
 
             <Text style={styles.sectionCount}>
-              4 opciones
+              {products.length} opciones
             </Text>
           </View>
 
@@ -134,14 +109,10 @@ export default function HomeScreen({ navigation }) {
                   {item.name}
                 </Text>
 
-                {item.tag ? (
-                  <View style={styles.tag}>
-                    <Text
-                      style={styles.tagText}
-                    >
-                      {item.tag}
-                    </Text>
-                  </View>
+                {item.description ? (
+                  <Text style={styles.descriptionText} numberOfLines={2}>
+                    {item.description}
+                  </Text>
                 ) : null}
 
                 <Text style={styles.price}>
@@ -305,27 +276,18 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 16,
     fontWeight: "700",
-    marginBottom: 6,
+    marginBottom: 4,
   },
 
-  tag: {
-    alignSelf: "flex-start",
-    backgroundColor: "#FFE4C4",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 10,
+  descriptionText: {
+    fontSize: 13,
+    color: "#666",
     marginBottom: 6,
-  },
-
-  tagText: {
-    fontSize: 12,
-    color: "#B86A00",
-    fontWeight: "600",
   },
 
   price: {
     color: "#FF6B00",
-    marginTop: 5,
+    marginTop: 2,
     fontSize: 22,
     fontWeight: "700",
   },

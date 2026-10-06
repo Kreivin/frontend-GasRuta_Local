@@ -10,6 +10,8 @@ import {
 } from "react-native";
 
 import { CartContext } from "../context/CartContext";
+import api from "../services/api";
+
 
 export default function OrderStatusScreen({
   navigation,
@@ -39,19 +41,63 @@ export default function OrderStatusScreen({
 
   const total = subtotal + 50;
 
-  const confirmPurchase = () => {
+const confirmPurchase = async () => {
+  console.log("BOTÓN PRESIONADO");
+
+  try {
+    const pedido = {
+      usuarioId: "ERVg2bLSOG1giSdoDxMB",
+      direcciones: [
+        {
+          direccion1: address,
+        },
+      ],
+      referencia: "Pedido desde App",
+      subtotal,
+      deliveri: 50,
+      productos: [],
+    };
+
+    console.log("ANTES DEL POST");
+    console.log("Enviando pedido:", pedido);
+
+   const response = await api.post("/pedidos", pedido);
+
+console.log("Pedido creado:", response.data);
+
+setConfirmed(true);
+
+setTimeout(() => {
+  setConfirmed(false);
+  clearCart();
+
+  navigation.reset({
+    index: 0,
+    routes: [{ name: "Home" }],
+  });
+}, 3000);
+
     setConfirmed(true);
+  } catch (error) {
+    console.log("ERROR COMPLETO:", error);
 
-    setTimeout(() => {
-      clearCart();
+    if (error.response) {
+      console.log("STATUS:", error.response.status);
+      console.log("DATA:", error.response.data);
 
-      navigation.reset({
-        index: 0,
-        routes: [{ name: "Home" }],
-      });
-    }, 2000);
-  };
+      alert(
+        `Error ${error.response.status}: ${
+          error.response.data.error || "Error del servidor"
+        }`
+      );
+    } else {
+      alert(error.message);
+    }
+  }
 
+
+
+};
   return (
     <View style={styles.container}>
       <View style={styles.phone}>
