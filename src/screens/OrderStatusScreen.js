@@ -12,92 +12,93 @@ import {
 import { CartContext } from "../context/CartContext";
 import api from "../services/api";
 
-
 export default function OrderStatusScreen({
   navigation,
   route,
 }) {
   const { cart, clearCart } = useContext(CartContext);
 
-  const [modalVisible, setModalVisible] =
-    useState(false);
-
-  const [confirmed, setConfirmed] =
-    useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
 
   const address =
     route.params?.address ||
     "Juigalpa, Chontales";
 
-  const subtotal = cart.reduce(
-    (sum, item) =>
-      sum +
-      Number(
-        String(item.price).replace(",", "")
-      ) *
-        item.qty,
-    0
-  );
+  // Función robusta para limpiar cualquier formato sucio o duplicado y extraer el valor numérico
+  const getSafePrice = (item) => {
+    if (!item) return 200;
+    const raw = item.price !== undefined ? item.price : (item.precio !== undefined ? item.precio : 200);
+    
+    if (typeof raw === "number" && !isNaN(raw)) return raw;
+
+    const cleanStr = String(raw).replace(/[C\$]+/g, "").trim();
+    const match = cleanStr.match(/\d+(\.\d+)?/g);
+    
+    if (match && match.length > 0) {
+      const parsed = parseFloat(match[match.length - 1]);
+      return isNaN(parsed) ? 200 : parsed;
+    }
+    
+    return 200;
+  };
+
+  const subtotal = cart.reduce((sum, item) => {
+    const cleanPrice = getSafePrice(item);
+    const qty = Number(item.qty) || 1;
+    return sum + cleanPrice * qty;
+  }, 0);
 
   const total = subtotal + 50;
 
-const confirmPurchase = async () => {
-  console.log("BOTÓN PRESIONADO");
+  const confirmPurchase = async () => {
+    console.log("BOTÓN PRESIONADO");
 
-  try {
-    const pedido = {
-      usuarioId: "ERVg2bLSOG1giSdoDxMB",
-      direcciones: [
-        {
-          direccion1: address,
-        },
-      ],
-      referencia: "Pedido desde App",
-      subtotal,
-      deliveri: 50,
-      productos: [],
-    };
+    try {
+      const pedido = {
+        usuarioId: "ERVg2bLSOG1giSdoDxMB",
+        direcciones: [
+          {
+            direccion1: address,
+          },
+        ],
+        referencia: "Pedido desde App",
+        subtotal,
+        deliveri: 50,
+        productos: [],
+      };
 
-    console.log("ANTES DEL POST");
-    console.log("Enviando pedido:", pedido);
+      const response = await api.post("/pedidos", pedido);
 
-   const response = await api.post("/pedidos", pedido);
+      console.log("Pedido creado:", response.data);
 
-console.log("Pedido creado:", response.data);
+      setConfirmed(true);
 
-setConfirmed(true);
+      setTimeout(() => {
+        setConfirmed(false);
+        clearCart();
 
-setTimeout(() => {
-  setConfirmed(false);
-  clearCart();
+        navigation.reset({
+          index: 0,
+          routes: [{ name: "MainTabs" }],
+        });
+      }, 3000);
 
-  navigation.reset({
-    index: 0,
-    routes: [{ name: "Home" }],
-  });
-}, 3000);
+    } catch (error) {
+      console.log("ERROR COMPLETO:", error);
 
-    setConfirmed(true);
-  } catch (error) {
-    console.log("ERROR COMPLETO:", error);
-
-    if (error.response) {
-      console.log("STATUS:", error.response.status);
-      console.log("DATA:", error.response.data);
-
-      alert(
-        `Error ${error.response.status}: ${
-          error.response.data.error || "Error del servidor"
-        }`
-      );
-    } else {
-      alert(error.message);
+      if (error.response) {
+        alert(
+          `Error ${error.response.status}: ${
+            error.response.data.error || "Error del servidor"
+          }`
+        );
+      } else {
+        alert(error.message);
+      }
     }
-  }
+  };
 
-
-
-};
   return (
     <View style={styles.container}>
       <View style={styles.phone}>
@@ -113,7 +114,7 @@ setTimeout(() => {
             </TouchableOpacity>
 
             <Text style={styles.title}>
-              Estado del pedido
+              Mi pedido
             </Text>
           </View>
 
@@ -152,28 +153,28 @@ setTimeout(() => {
               RESUMEN
             </Text>
 
-            {cart.map((item) => (
-              <View
-                key={item.id}
-                style={styles.row}
-              >
-                <Text>
-                  {
-                    item.name.split("—")[0]
-                  }{" "}
-                  x {item.qty}
-                </Text>
+            {cart.map((item, index) => {
+              const cleanPrice = getSafePrice(item);
+              const qty = Number(item.qty) || 1;
+              const itemName = item.name ? item.name.split("—")[0] : "Tanque de gas";
 
-                <Text>
-                  C$
-                  {Number(
-                    String(
-                      item.price
-                    ).replace(",", "")
-                  ) * item.qty}
-                </Text>
-              </View>
-            ))}
+              return (
+                <View
+                  key={item.id || index}
+                  style={styles.row}
+                >
+                  <Text>
+                    {itemName} x {qty}
+                  </Text>
+                  <Text>C${cleanPrice * qty}</Text>
+                </View>
+              );
+            })}
+
+            <View style={styles.row}>
+              <Text style={styles.subtotalLabel}>Subtotal productos</Text>
+              <Text>C${subtotal}</Text>
+            </View>
 
             <View style={styles.row}>
               <Text>Delivery</Text>
@@ -188,7 +189,7 @@ setTimeout(() => {
                   styles.totalLabel
                 }
               >
-                Total pagado
+                Total a pagar
               </Text>
 
               <Text style={styles.total}>
@@ -215,7 +216,7 @@ setTimeout(() => {
             onPress={confirmPurchase}
           >
             <Text style={styles.confirmText}>
-              Confirmar compra
+              Continuar →
             </Text>
           </TouchableOpacity>
         </View>
@@ -284,7 +285,7 @@ setTimeout(() => {
                       index: 0,
                       routes: [
                         {
-                          name: "Home",
+                          name: "MainTabs",
                         },
                       ],
                     });
@@ -313,21 +314,18 @@ const styles = StyleSheet.create({
     backgroundColor: "#EAEAEA",
     alignItems: "center",
   },
-
   phone: {
     width: 430,
     maxWidth: "100%",
     flex: 1,
     backgroundColor: "#FFF",
   },
-
   header: {
     flexDirection: "row",
     alignItems: "center",
     padding: 20,
     paddingTop: 50,
   },
-
   backBtn: {
     width: 40,
     height: 40,
@@ -337,12 +335,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginRight: 15,
   },
-
   title: {
     fontSize: 24,
     fontWeight: "700",
   },
-
   statusCard: {
     margin: 20,
     backgroundColor: "#1B1435",
@@ -350,21 +346,17 @@ const styles = StyleSheet.create({
     padding: 30,
     alignItems: "center",
   },
-
   truck: { fontSize: 50 },
-
   statusTitle: {
     color: "#FFF",
     fontSize: 24,
     fontWeight: "700",
     marginTop: 15,
   },
-
   statusText: {
     color: "#DDD",
     marginTop: 10,
   },
-
   badge: {
     marginTop: 15,
     backgroundColor: "#FFB000",
@@ -372,11 +364,9 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 20,
   },
-
   badgeText: {
     fontWeight: "700",
   },
-
   addressCard: {
     backgroundColor: "#FFF",
     marginHorizontal: 20,
@@ -385,18 +375,15 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     elevation: 3,
   },
-
   sectionTitle: {
     color: "#777",
     marginBottom: 10,
     fontWeight: "700",
   },
-
   address: {
     fontSize: 16,
     fontWeight: "600",
   },
-
   summary: {
     backgroundColor: "#FFF",
     margin: 20,
@@ -405,28 +392,26 @@ const styles = StyleSheet.create({
     elevation: 3,
     marginBottom: 120,
   },
-
   row: {
     flexDirection: "row",
     justifyContent: "space-between",
     marginBottom: 10,
   },
-
   line: {
     height: 1,
     backgroundColor: "#EEE",
     marginVertical: 10,
   },
-
+  subtotalLabel: {
+    color: "#555",
+  },
   totalLabel: {
     fontWeight: "700",
   },
-
   total: {
     color: "#FF6B00",
     fontWeight: "700",
   },
-
   footer: {
     position: "absolute",
     bottom: 20,
@@ -435,7 +420,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
   },
-
   cancelBtn: {
     flex: 1,
     backgroundColor: "#FBE5E5",
@@ -443,7 +427,6 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: "center",
   },
-
   confirmBtn: {
     flex: 1,
     backgroundColor: "#FF6B00",
@@ -451,71 +434,58 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: "center",
   },
-
   cancelText: {
     color: "#D94A4A",
     fontWeight: "700",
   },
-
   confirmText: {
     color: "#FFF",
     fontWeight: "700",
   },
-
   overlay: {
     flex: 1,
-    backgroundColor:
-      "rgba(0,0,0,0.4)",
+    backgroundColor: "rgba(0,0,0,0.4)",
     justifyContent: "center",
     alignItems: "center",
   },
-
   popup: {
     backgroundColor: "#15153A",
     padding: 25,
     borderRadius: 20,
     width: "85%",
   },
-
   popupTitle: {
     color: "#FFF",
     fontSize: 20,
     fontWeight: "700",
     marginBottom: 10,
   },
-
   overlayBottom: {
     flex: 1,
     justifyContent: "flex-end",
-    backgroundColor:
-      "rgba(0,0,0,0.4)",
+    backgroundColor: "rgba(0,0,0,0.4)",
   },
-
   cancelModal: {
     backgroundColor: "#FFF",
     padding: 25,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
   },
-
   cancelTitle: {
     fontSize: 24,
     fontWeight: "700",
   },
-
   cancelSub: {
     marginTop: 10,
     color: "#666",
     marginBottom: 20,
   },
-
   reason: {
     backgroundColor: "#F3F3F3",
     padding: 18,
     borderRadius: 15,
     marginBottom: 10,
   },
-
   input: {
     backgroundColor: "#F3F3F3",
     height: 100,

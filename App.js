@@ -14,7 +14,7 @@ import VistaAdminScreen from "./src/screens/VistaAdminScreen";
 import NuevoProductoScreen from "./src/screens/NuevoProductoScreen";
 
 import { CartProvider } from "./src/context/CartContext";
-import { ProductProvider } from "./src/context/ProductContext"; // <-- Proveedor de productos añadido
+import { ProductProvider } from "./src/context/ProductContext";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -49,11 +49,39 @@ function MainTabs() {
       <Tab.Screen
         name="Catálogo"
         component={HomeScreen}
+        // Bloquea la navegación si estás dentro de Admin
+        listeners={({ navigation }) => ({
+          tabPress: (e) => {
+            const state = navigation.getState();
+            const currentRouteName = state?.routes[state.index]?.name;
+            if (currentRouteName === "Admin") {
+              e.preventDefault();
+            }
+          },
+        })}
+        // Reduce la opacidad visualmente cuando el Admin está activo
+        options={({ navigation }) => {
+          const state = navigation.getState();
+          const currentRouteName = state?.routes[state.index]?.name;
+          const isAdminActive = currentRouteName === "Admin";
+          return {
+            tabBarItemStyle: isAdminActive ? { opacity: 0.4 } : {},
+          };
+        }}
       />
 
       <Tab.Screen
         name="Admin"
         component={AdminStack}
+        options={({ route }) => {
+          const routeName = route.state?.routes[route.state.index]?.name;
+          if (routeName === "NuevoProducto") {
+            return {
+              tabBarStyle: { display: "none" },
+            };
+          }
+          return {};
+        }}
       />
     </Tab.Navigator>
   );
@@ -107,20 +135,20 @@ export default function App() {
 const styles = StyleSheet.create({
   webContainer: {
     flex: 1,
-    backgroundColor: '#e0e0e0', // Fondo gris claro alrededor del celular en la PC
+    backgroundColor: '#e0e0e0',
     justifyContent: 'center',
     alignItems: 'center',
   },
   phoneContainer: {
     flex: 1,
     width: '100%',
-    maxWidth: 420, // Ancho máximo simulando la pantalla de un celular
+    maxWidth: 420,
     backgroundColor: '#ffffff',
     ...Platform.select({
       web: {
         height: '100vh',
-        maxHeight: 896, // Altura máxima simulada
-        boxShadow: '0 0 20px rgba(0,0,0,0.2)', // Sombra elegante para que parezca un dispositivo real
+        maxHeight: 896,
+        boxShadow: '0 0 20px rgba(0,0,0,0.2)',
       },
     }),
   },

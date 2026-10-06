@@ -19,6 +19,15 @@ export default function HomeScreen({ navigation }) {
     0
   );
 
+  // Función para limpiar precios malformados o con C$ duplicado
+  const getCleanPriceDisplay = (priceVal) => {
+    if (!priceVal) return "200";
+    const raw = String(priceVal);
+    const clean = raw.replace(/[C\$]+/g, "").trim();
+    const match = clean.match(/\d+(\.\d+)?/g);
+    return match ? match[match.length - 1] : "200";
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.phone}>
@@ -93,45 +102,49 @@ export default function HomeScreen({ navigation }) {
           </View>
 
           {/* PRODUCTOS */}
-          {products.map((item) => (
-            <View
-              key={item.id}
-              style={styles.card}
-            >
-              <View style={styles.iconBox}>
-                <Text style={styles.icon}>
-                  🛢️
-                </Text>
-              </View>
+          {products.map((item) => {
+            const cleanNumericPrice = Number(getCleanPriceDisplay(item.price));
 
-              <View style={{ flex: 1 }}>
-                <Text style={styles.name}>
-                  {item.name}
-                </Text>
-
-                {item.description ? (
-                  <Text style={styles.descriptionText} numberOfLines={2}>
-                    {item.description}
-                  </Text>
-                ) : null}
-
-                <Text style={styles.price}>
-                  C${item.price}
-                </Text>
-              </View>
-
-              <TouchableOpacity
-                style={styles.plus}
-                onPress={() =>
-                  addToCart(item)
-                }
+            return (
+              <View
+                key={item.id}
+                style={styles.card}
               >
-                <Text style={styles.plusText}>
-                  +
-                </Text>
-              </TouchableOpacity>
-            </View>
-          ))}
+                <View style={styles.iconBox}>
+                  <Text style={styles.icon}>
+                    🛢️
+                  </Text>
+                </View>
+
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.name}>
+                    {item.name}
+                  </Text>
+
+                  {item.description ? (
+                    <Text style={styles.descriptionText} numberOfLines={2}>
+                      {item.description}
+                    </Text>
+                  ) : null}
+
+                  <Text style={styles.price}>
+                    C${cleanNumericPrice}
+                  </Text>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.plus}
+                  onPress={() =>
+                    addToCart({ ...item, price: cleanNumericPrice })
+                  }
+                >
+                  <Text style={styles.plusText}>
+                    +
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            );
+          })}
         </ScrollView>
       </View>
     </View>
@@ -145,14 +158,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-
   phone: {
     width: 430,
     maxWidth: "100%",
     flex: 1,
     backgroundColor: "#FFF",
   },
-
   headerRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -160,18 +171,15 @@ const styles = StyleSheet.create({
     padding: 25,
     paddingTop: 50,
   },
-
   locationLabel: {
     color: "#999",
     fontSize: 12,
   },
-
   location: {
     marginTop: 5,
     fontWeight: "700",
     fontSize: 16,
   },
-
   cartBtn: {
     width: 50,
     height: 50,
@@ -180,7 +188,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-
   badge: {
     position: "absolute",
     top: -5,
@@ -192,32 +199,27 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-
   badgeText: {
     color: "#FFF",
     fontSize: 12,
     fontWeight: "700",
   },
-
   banner: {
     marginHorizontal: 20,
     backgroundColor: "#FF6B00",
     borderRadius: 20,
     padding: 20,
   },
-
   offer: {
     color: "#FFD5A5",
     marginBottom: 10,
     fontWeight: "600",
   },
-
   bannerTitle: {
     color: "#FFF",
     fontSize: 28,
     fontWeight: "700",
   },
-
   bannerBtn: {
     backgroundColor: "#FFC107",
     alignSelf: "flex-start",
@@ -226,11 +228,9 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 20,
   },
-
   bannerBtnText: {
     fontWeight: "700",
   },
-
   sectionRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -238,16 +238,13 @@ const styles = StyleSheet.create({
     marginTop: 30,
     marginBottom: 15,
   },
-
   sectionTitle: {
     fontSize: 20,
     fontWeight: "700",
   },
-
   sectionCount: {
     color: "#999",
   },
-
   card: {
     backgroundColor: "#FFF",
     marginHorizontal: 20,
@@ -258,7 +255,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     elevation: 3,
   },
-
   iconBox: {
     width: 60,
     height: 60,
@@ -268,30 +264,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginRight: 15,
   },
-
   icon: {
     fontSize: 28,
   },
-
   name: {
     fontSize: 16,
     fontWeight: "700",
     marginBottom: 4,
   },
-
   descriptionText: {
     fontSize: 13,
     color: "#666",
     marginBottom: 6,
   },
-
   price: {
     color: "#FF6B00",
     marginTop: 2,
     fontSize: 22,
     fontWeight: "700",
   },
-
   plus: {
     width: 42,
     height: 42,
@@ -300,7 +291,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-
   plusText: {
     color: "#FFF",
     fontSize: 24,
