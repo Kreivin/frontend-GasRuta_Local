@@ -1,4 +1,4 @@
-import React, { useContext } from "react";
+import React, { useContext, useState } from "react";
 import {
   View,
   Text,
@@ -6,12 +6,60 @@ import {
   TouchableOpacity,
   ScrollView,
   TextInput,
+  Alert,
 } from "react-native";
+import * as Location from "expo-location";
 
 import { CartContext } from "../context/CartContext";
 
 export default function DeliveryScreen({ navigation }) {
   const { cart } = useContext(CartContext);
+
+  const [barrio, setBarrio] = useState("");
+  const [referencia, setReferencia] = useState("");
+  const [loadingGps, setLoadingGps] = useState(false);
+
+  // Función para obtener la ubicación actual con expo-location
+  const handleGetLocation = async () => {
+    try {
+      setLoadingGps(true);
+      
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "Permiso denegado",
+          "Necesitamos permisos de ubicación para autocompletar tu dirección."
+        );
+        setLoadingGps(false);
+        return;
+      }
+
+      let location = await Location.getCurrentPositionAsync({});
+      const { latitude, longitude } = location.coords;
+
+      let reverseGeocode = await Location.reverseGeocodeAsync({
+        latitude,
+        longitude,
+      });
+
+      if (reverseGeocode.length > 0) {
+        const addressData = reverseGeocode[0];
+        const detectedBarrio = addressData.district || addressData.subregion || addressData.city || "Juigalpa";
+        const detectedStreet = addressData.street || addressData.name || "Ubicación GPS actual";
+        
+        setBarrio(detectedBarrio);
+        setReferencia(`Coordenadas detectadas (${detectedStreet})`);
+      } else {
+        setBarrio("Juigalpa, Chontales");
+        setReferencia(`Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)}`);
+      }
+
+      setLoadingGps(false);
+    } catch (error) {
+      setLoadingGps(false);
+      Alert.alert("Error", "No pudimos obtener tu ubicación actual. Inténtalo de nuevo.");
+    }
+  };
 
   const subtotal = cart.reduce(
     (sum, item) =>
@@ -23,6 +71,17 @@ export default function DeliveryScreen({ navigation }) {
 
   const delivery = 50;
   const total = subtotal + delivery;
+
+  const handleConfirmOrder = () => {
+    if (!barrio.trim()) {
+      alert("Por favor, ingresa o detecta tu barrio/sector.");
+      return;
+    }
+    
+    // Pasamos la dirección completa formateada a la siguiente pantalla
+    const fullAddress = `${barrio}${referencia ? ` - ${referencia}` : ""}`;
+    navigation.navigate("OrderStatus", { address: fullAddress });
+  };
 
   return (
     <View style={styles.container}>
@@ -44,8 +103,22 @@ export default function DeliveryScreen({ navigation }) {
 
           <View style={styles.mapBox}>
             <Text style={styles.mapIcon}>🗺️</Text>
-            <Text>Juigalpa, Chontales</Text>
+            <Text style={{ fontWeight: "700", color: "#1B1435" }}>Juigalpa, Chontales</Text>
+            <Text style={{ fontSize: 13, color: "#666", marginTop: 4 }}>
+              {barrio ? `📍 ${barrio}` : "Ubicación de cobertura local"}
+            </Text>
           </View>
+
+          {/* BOTÓN GPS */}
+          <TouchableOpacity
+            style={styles.gpsButton}
+            onPress={handleGetLocation}
+            disabled={loadingGps}
+          >
+            <Text style={styles.gpsButtonText}>
+              {loadingGps ? "Obteniendo ubicación..." : "📍 Usar mi ubicación GPS actual"}
+            </Text>
+          </TouchableOpacity>
 
           <Text style={styles.label}>
             BARRIO / SECTOR
@@ -54,6 +127,8 @@ export default function DeliveryScreen({ navigation }) {
           <TextInput
             style={styles.input}
             placeholder="Ej: Barrio El Carmen"
+            value={barrio}
+            onChangeText={setBarrio}
           />
 
           <Text style={styles.label}>
@@ -61,9 +136,11 @@ export default function DeliveryScreen({ navigation }) {
           </Text>
 
           <TextInput
-            style={[styles.input, { height: 100 }]}
+            style={[styles.input, { height: 100, textAlignVertical: "top" }]}
             multiline
             placeholder="Ej: Casa azul con portón negro"
+            value={referencia}
+            onChangeText={setReferencia}
           />
 
           <View style={styles.summary}>
@@ -111,14 +188,14 @@ export default function DeliveryScreen({ navigation }) {
             </View>
           </View>
 
-         <TouchableOpacity
-        style={styles.button}
-        onPress={() => navigation.navigate("OrderStatus")}
-        >
-        <Text style={styles.buttonText}>
-            Confirmar pedido 🚚
-        </Text>
-</TouchableOpacity>
+          <TouchableOpacity
+            style={styles.button}
+            onPress={handleConfirmOrder}
+          >
+            <Text style={styles.buttonText}>
+              Confirmar pedido 🚚
+            </Text>
+          </TouchableOpacity>
 
         </ScrollView>
       </View>
@@ -163,16 +240,36 @@ const styles = StyleSheet.create({
   },
 
   mapBox: {
-    margin: 20,
+    marginHorizontal: 20,
+    marginBottom: 15,
     backgroundColor: "#EDF4EE",
-    padding: 40,
+    padding: 25,
     borderRadius: 20,
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#D5E5D8",
   },
 
   mapIcon: {
-    fontSize: 50,
-    marginBottom: 10,
+    fontSize: 40,
+    marginBottom: 8,
+  },
+
+  gpsButton: {
+    backgroundColor: "#E8F0FE",
+    marginHorizontal: 20,
+    marginBottom: 20,
+    borderRadius: 15,
+    paddingVertical: 14,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#D2E3FC",
+  },
+
+  gpsButtonText: {
+    color: "#1A73E8",
+    fontWeight: "700",
+    fontSize: 15,
   },
 
   label: {
