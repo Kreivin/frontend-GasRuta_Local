@@ -16,10 +16,10 @@ export default function LoginScreen({ navigation }) {
           colors={["#1F1B2E", "#4A2218"]}
           style={styles.header}
         >
-          <Text style={styles.logo}>🔥 GasFácil</Text>
+          <Text style={styles.logo}>🔥 GasRuta-Local</Text>
 
           <Text style={styles.subtitle}>
-            Tu gas de cocina en minutos
+            Tu distribuidor de gas de confianza
           </Text>
         </LinearGradient>
 
