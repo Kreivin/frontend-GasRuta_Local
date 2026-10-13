@@ -1,5 +1,6 @@
 import React from "react";
-import { StyleSheet, View, Platform } from "react-native";
+import { StyleSheet, View, Platform, Image } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
@@ -44,6 +45,8 @@ function MainTabs() {
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
+        tabBarActiveTintColor: "#FF6B00",
+        tabBarInactiveTintColor: "#888",
       }}
     >
       <Tab.Screen
@@ -66,6 +69,20 @@ function MainTabs() {
           const isAdminActive = currentRouteName === "Admin";
           return {
             tabBarItemStyle: isAdminActive ? { opacity: 0.4 } : {},
+            tabBarIcon: ({ size, focused }) => (
+              <Image
+                source={{
+                  uri: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRZjFTQ_ArJQoQViRAJpxC4LpQJqu71lbzxAQBhL172AQ&s=10",
+                }}
+                style={{
+                  width: size ? size + 4 : 28,
+                  height: size ? size + 4 : 28,
+                  borderRadius: (size ? size + 4 : 28) / 2,
+                  opacity: focused ? 1 : 0.65,
+                }}
+                resizeMode="contain"
+              />
+            ),
           };
         }}
       />
@@ -75,12 +92,17 @@ function MainTabs() {
         component={AdminStack}
         options={({ route }) => {
           const routeName = route.state?.routes[route.state.index]?.name;
-          if (routeName === "NuevoProducto") {
-            return {
-              tabBarStyle: { display: "none" },
-            };
-          }
-          return {};
+          const isHidden = routeName === "NuevoProducto";
+          return {
+            tabBarStyle: isHidden ? { display: "none" } : undefined,
+            tabBarIcon: ({ size, color, focused }) => (
+              <Ionicons
+                name={focused ? "settings" : "settings-outline"}
+                size={size || 24}
+                color={color}
+              />
+            ),
+          };
         }}
       />
     </Tab.Navigator>

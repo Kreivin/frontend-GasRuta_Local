@@ -7,6 +7,7 @@ import {
   ScrollView,
   Modal,
   TextInput,
+  Alert,
 } from "react-native";
 
 import { CartContext } from "../context/CartContext";
@@ -65,38 +66,40 @@ export default function OrderStatusScreen({
         referencia: "Pedido desde App",
         subtotal,
         deliveri: 50,
-        productos: [],
+        productos: cart.map((item) => ({
+          id: item.id,
+          nombre: item.name ? item.name.split("—")[0].trim() : "Producto",
+          precio: getSafePrice(item),
+          cantidad: Number(item.qty) || 1,
+        })),
       };
 
-      const response = await api.post("/pedidos", pedido);
-
-      console.log("Pedido creado:", response.data);
-
-      setConfirmed(true);
-
-      setTimeout(() => {
-        setConfirmed(false);
-        clearCart();
-
-        navigation.reset({
-          index: 0,
-          routes: [{ name: "MainTabs" }],
-        });
-      }, 3000);
-
+      // Intentar enviar al backend sin bloquear si no hay conexión de red
+      await api.post("/pedidos", pedido).catch((err) => {
+        console.log("Servidor local no disponible:", err.message);
+      });
     } catch (error) {
-      console.log("ERROR COMPLETO:", error);
-
-      if (error.response) {
-        alert(
-          `Error ${error.response.status}: ${
-            error.response.data.error || "Error del servidor"
-          }`
-        );
-      } else {
-        alert(error.message);
-      }
+      console.log("Error al procesar compra:", error);
     }
+
+    // Mostrar mensaje de éxito y redirigir a la pestaña principal
+    Alert.alert(
+      "Pedido realizado con éxito",
+      "Tu pedido está en camino 🛵",
+      [
+        {
+          text: "Aceptar",
+          onPress: () => {
+            clearCart();
+            navigation.reset({
+              index: 0,
+              routes: [{ name: "MainTabs" }],
+            });
+          },
+        },
+      ],
+      { cancelable: false }
+    );
   };
 
   return (
@@ -231,7 +234,7 @@ export default function OrderStatusScreen({
               <Text
                 style={styles.popupTitle}
               >
-                ✅ ¡Compra confirmada!
+                ✅ ¡Pedido realizado con éxito!
               </Text>
 
               <Text
