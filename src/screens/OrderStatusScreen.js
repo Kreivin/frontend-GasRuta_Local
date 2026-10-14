@@ -82,18 +82,29 @@ export default function OrderStatusScreen({
       console.log("Error al procesar compra:", error);
     }
 
-    // Mostrar mensaje de éxito y redirigir a la pestaña principal
+    // Mostrar mensaje de éxito y permitir calificar el servicio
     Alert.alert(
       "Pedido realizado con éxito",
-      "Tu pedido está en camino 🛵",
+      "Tu pedido está en camino 🛵\n¿Deseas calificar tu experiencia?",
       [
         {
-          text: "Aceptar",
+          text: "Inicio",
           onPress: () => {
             clearCart();
             navigation.reset({
               index: 0,
               routes: [{ name: "MainTabs" }],
+            });
+          },
+        },
+        {
+          text: "⭐ Dejar Reseña",
+          onPress: () => {
+            clearCart();
+            navigation.navigate("Resena", {
+              pedidoId: "NTiOxIHiRc8ZXWxcmVfR",
+              clienteId: "MFSECY3Z1K6X3JePUdO5",
+              repartidorId: "SPk4vMRTErAtvsg23WHa",
             });
           },
         },

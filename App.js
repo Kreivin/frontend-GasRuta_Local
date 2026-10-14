@@ -10,12 +10,16 @@ import HomeScreen from "./src/screens/HomeScreen";
 import CartScreen from "./src/screens/CartScreen";
 import DeliveryScreen from "./src/screens/DeliveryScreen";
 import OrderStatusScreen from "./src/screens/OrderStatusScreen";
+import RutaScreen from "./src/screens/RutaScreen";
+import ResenaScreen from "./src/screens/ResenaScreen";
 
 import VistaAdminScreen from "./src/screens/VistaAdminScreen";
 import NuevoProductoScreen from "./src/screens/NuevoProductoScreen";
 
 import { CartProvider } from "./src/context/CartContext";
 import { ProductProvider } from "./src/context/ProductContext";
+import { RutaProvider } from "./src/context/RutaContext";
+import { ResenaProvider } from "./src/context/ResenaContext";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -88,6 +92,34 @@ function MainTabs() {
       />
 
       <Tab.Screen
+        name="Rutas"
+        component={RutaScreen}
+        options={{
+          tabBarIcon: ({ size, color, focused }) => (
+            <Ionicons
+              name={focused ? "map" : "map-outline"}
+              size={size || 24}
+              color={color}
+            />
+          ),
+        }}
+      />
+
+      <Tab.Screen
+        name="Reseñas"
+        component={ResenaScreen}
+        options={{
+          tabBarIcon: ({ size, color, focused }) => (
+            <Ionicons
+              name={focused ? "chatbubble-ellipses" : "chatbubble-ellipses-outline"}
+              size={size || 24}
+              color={color}
+            />
+          ),
+        }}
+      />
+
+      <Tab.Screen
         name="Admin"
         component={AdminStack}
         options={({ route }) => {
@@ -114,40 +146,49 @@ export default function App() {
     <View style={styles.webContainer}>
       <View style={styles.phoneContainer}>
         <ProductProvider>
-          <CartProvider>
-            <NavigationContainer>
-              <Stack.Navigator
-                screenOptions={{
-                  headerShown: false,
-                }}
-              >
-                <Stack.Screen
-                  name="Login"
-                  component={LoginScreen}
-                />
+          <RutaProvider>
+            <ResenaProvider>
+              <CartProvider>
+                <NavigationContainer>
+                  <Stack.Navigator
+                    screenOptions={{
+                      headerShown: false,
+                    }}
+                  >
+                    <Stack.Screen
+                      name="Login"
+                      component={LoginScreen}
+                    />
 
-                <Stack.Screen
-                  name="MainTabs"
-                  component={MainTabs}
-                />
+                    <Stack.Screen
+                      name="MainTabs"
+                      component={MainTabs}
+                    />
 
-                <Stack.Screen
-                  name="Cart"
-                  component={CartScreen}
-                />
+                    <Stack.Screen
+                      name="Cart"
+                      component={CartScreen}
+                    />
 
-                <Stack.Screen
-                  name="Delivery"
-                  component={DeliveryScreen}
-                />
+                    <Stack.Screen
+                      name="Delivery"
+                      component={DeliveryScreen}
+                    />
 
-                <Stack.Screen
-                  name="OrderStatus"
-                  component={OrderStatusScreen}
-                />
-              </Stack.Navigator>
-            </NavigationContainer>
-          </CartProvider>
+                    <Stack.Screen
+                      name="OrderStatus"
+                      component={OrderStatusScreen}
+                    />
+
+                    <Stack.Screen
+                      name="Resena"
+                      component={ResenaScreen}
+                    />
+                  </Stack.Navigator>
+                </NavigationContainer>
+              </CartProvider>
+            </ResenaProvider>
+          </RutaProvider>
         </ProductProvider>
       </View>
     </View>
