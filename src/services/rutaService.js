@@ -22,7 +22,7 @@ import {
   onSnapshot,
   Timestamp,
 } from "firebase/firestore";
-import { db } from "./firebaseConfig";
+import { db } from "./firebaseConfig.js";
 
 const RUTA_COLLECTION = "Ruta";
 
@@ -82,6 +82,7 @@ export async function obtenerRuta(rutaId) {
         fecha_final: data.fecha_final?.toDate() || null,
         ruta_asignada: data.ruta_asignada,
         tiempo_estimado: data.tiempo_estimado,
+        estado: data.estado || "asignada",
       };
     }
 
@@ -112,6 +113,7 @@ export async function obtenerTodasLasRutas() {
         fecha_final: data.fecha_final?.toDate() || null,
         ruta_asignada: data.ruta_asignada,
         tiempo_estimado: data.tiempo_estimado,
+        estado: data.estado || "asignada",
       });
     });
 
@@ -148,6 +150,7 @@ export async function obtenerRutasPorPedido(pedidoId) {
         fecha_final: data.fecha_final?.toDate() || null,
         ruta_asignada: data.ruta_asignada,
         tiempo_estimado: data.tiempo_estimado,
+        estado: data.estado || "asignada",
       });
     });
 
@@ -180,6 +183,7 @@ export function escucharRutas(callback) {
         fecha_final: data.fecha_final?.toDate() || null,
         ruta_asignada: data.ruta_asignada,
         tiempo_estimado: data.tiempo_estimado,
+        estado: data.estado || "asignada",
       });
     });
 

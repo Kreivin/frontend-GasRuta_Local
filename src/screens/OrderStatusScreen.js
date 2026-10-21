@@ -11,6 +11,8 @@ import {
 } from "react-native";
 
 import { CartContext } from "../context/CartContext";
+import { AuthContext } from "../context/AuthContext";
+import { PedidoContext } from "../context/PedidoContext";
 import api from "../services/api";
 
 export default function OrderStatusScreen({
@@ -18,9 +20,13 @@ export default function OrderStatusScreen({
   route,
 }) {
   const { cart, clearCart } = useContext(CartContext);
+  const { currentUser } = useContext(AuthContext);
+  const { crearNuevoPedido } = useContext(PedidoContext);
 
   const [modalVisible, setModalVisible] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [createdOrderId, setCreatedOrderId] = useState(null);
 
   const address =
     route.params?.address ||
@@ -53,39 +59,61 @@ export default function OrderStatusScreen({
   const total = subtotal + 50;
 
   const confirmPurchase = async () => {
-    console.log("BOTÓN PRESIONADO");
+    console.log("Confirmando compra con Firestore y Backend");
+    setLoading(true);
+
+    let pedidoIdFinal = null;
 
     try {
-      const pedido = {
-        usuarioId: "ERVg2bLSOG1giSdoDxMB",
-        direcciones: [
-          {
-            direccion1: address,
-          },
-        ],
-        referencia: "Pedido desde App",
+      const primaryItem = cart[0] || {};
+      const pesoKg = primaryItem.pesoKg || 10;
+      const cantidad = cart.reduce((sum, i) => sum + (Number(i.qty) || 1), 0);
+      const usuarioId = currentUser?.id || "dehkUp2gjgVT0piTBKfX";
+
+      const datosPedido = {
+        usuarioId,
+        pesoKg,
+        cantidad,
+        direccion: address,
+        referencia: "Pedido desde App GasRuta Móvil",
+        costoEnvio: 50,
         subtotal,
-        deliveri: 50,
-        productos: cart.map((item) => ({
-          id: item.id,
-          nombre: item.name ? item.name.split("—")[0].trim() : "Producto",
-          precio: getSafePrice(item),
-          cantidad: Number(item.qty) || 1,
-        })),
+        producto: {
+          nombre: "Cilindro de gas",
+          presentacion: primaryItem.presentacion || `${pesoKg} kg`,
+          pesoKg,
+          precio: getSafePrice(primaryItem),
+        },
       };
 
-      // Intentar enviar al backend sin bloquear si no hay conexión de red
-      await api.post("/pedidos", pedido).catch((err) => {
-        console.log("Servidor local no disponible:", err.message);
-      });
+      // 1. Guardar directamente en Firestore con el formato exacto de la base de datos
+      const resPedido = await crearNuevoPedido(datosPedido);
+      pedidoIdFinal = resPedido?.id;
+      setCreatedOrderId(pedidoIdFinal);
+
+      // 2. Notificar al backend local en puerto 3000 si está activo
+      try {
+        await api.post("/pedidos", {
+          usuarioId,
+          pesoKg,
+          cantidad,
+          direccion: address,
+          referencia: "Pedido desde App GasRuta Móvil",
+          costoEnvio: 50,
+        });
+      } catch (backendErr) {
+        console.log("Sincronización backend opcional:", backendErr.message);
+      }
     } catch (error) {
       console.log("Error al procesar compra:", error);
+    } finally {
+      setLoading(false);
     }
 
     // Mostrar mensaje de éxito y permitir calificar el servicio
     Alert.alert(
-      "Pedido realizado con éxito",
-      "Tu pedido está en camino 🛵\n¿Deseas calificar tu experiencia?",
+      "🎉 ¡Pedido realizado con éxito!",
+      `Tu pedido #${pedidoIdFinal ? pedidoIdFinal.slice(0, 6) : "GR"} está en camino 🛵\n¿Deseas calificar tu experiencia?`,
       [
         {
           text: "Inicio",
@@ -102,8 +130,8 @@ export default function OrderStatusScreen({
           onPress: () => {
             clearCart();
             navigation.navigate("Resena", {
-              pedidoId: "NTiOxIHiRc8ZXWxcmVfR",
-              clienteId: "MFSECY3Z1K6X3JePUdO5",
+              pedidoId: pedidoIdFinal || "NTiOxIHiRc8ZXWxcmVfR",
+              clienteId: currentUser?.id || "dehkUp2gjgVT0piTBKfX",
               repartidorId: "SPk4vMRTErAtvsg23WHa",
             });
           },
@@ -150,6 +178,15 @@ export default function OrderStatusScreen({
                 EN CURSO
               </Text>
             </View>
+
+            <TouchableOpacity
+              style={{ marginTop: 14, flexDirection: "row", alignItems: "center" }}
+              onPress={() => navigation.navigate("Incidencia", { pedidoId: createdOrderId })}
+            >
+              <Text style={{ fontSize: 13, color: "#D9534F", fontWeight: "700" }}>
+                ⚠️ ¿Problemas con la entrega? Reportar incidencia
+              </Text>
+            </TouchableOpacity>
           </View>
 
           <View style={styles.addressCard}>

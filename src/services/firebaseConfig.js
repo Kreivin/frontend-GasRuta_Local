@@ -1,21 +1,21 @@
 // Configuración de Firebase para el proyecto GasRuta
-// Documentación: https://docs.expo.dev/guides/using-firebase/
-import { initializeApp } from "firebase/app";
+import { initializeApp, getApps } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 
-// TODO: Reemplaza estos valores con los de tu proyecto en Firebase Console
-// Ve a: Firebase Console → Configuración del proyecto → Apps → Configuración SDK
+// Credenciales del proyecto Firebase del usuario: gasruta-local-b7acb
 const firebaseConfig = {
-  apiKey: "TU_API_KEY",
-  authDomain: "TU_PROYECTO.firebaseapp.com",
-  projectId: "TU_PROJECT_ID",
-  storageBucket: "TU_PROYECTO.firebasestorage.app",
-  messagingSenderId: "TU_MESSAGING_SENDER_ID",
-  appId: "TU_APP_ID",
+  apiKey: "AIzaSyABG5P0wXki2H4uC6wsw39kguh5qmF6I4g",
+  authDomain: "gasruta-local-b7acb.firebaseapp.com",
+  projectId: "gasruta-local-b7acb",
+  storageBucket: "gasruta-local-b7acb.firebasestorage.app",
+  messagingSenderId: "545489309357",
+  appId: "1:545489309357:web:cd29a826ee358de8708024",
 };
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApps()[0];
 
-export { db };
+// Importante: La base de datos creada en este proyecto tiene ID 'default' (sin paréntesis)
+const db = getFirestore(app, "default");
+
+export { db, app };
 export default app;

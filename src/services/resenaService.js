@@ -22,7 +22,7 @@ import {
   onSnapshot,
   Timestamp,
 } from "firebase/firestore";
-import { db } from "./firebaseConfig";
+import { db } from "./firebaseConfig.js";
 
 const RESENA_COLLECTION = "Resena";
 

@@ -13,11 +13,13 @@ import {
 } from "react-native";
 
 import { RutaContext } from "../context/RutaContext";
+import { PedidoContext } from "../context/PedidoContext";
 import colors from "../theme/color";
 
 export default function RutaScreen({ navigation }) {
   const { rutas, loading, error, agregarRuta, editarRuta, borrarRuta, cargarRutas } =
     useContext(RutaContext);
+  const { pedidos } = useContext(PedidoContext);
 
   const [modalVisible, setModalVisible] = useState(false);
   const [editMode, setEditMode] = useState(false);
@@ -31,7 +33,7 @@ export default function RutaScreen({ navigation }) {
   const [tiempoEstimado, setTiempoEstimado] = useState("");
 
   const resetForm = () => {
-    setPedidoId("");
+    setPedidoId(pedidos[0]?.id || "");
     setDistanciaEstimada("");
     setRutaAsignada("");
     setTiempoEstimado("");
@@ -41,6 +43,9 @@ export default function RutaScreen({ navigation }) {
 
   const handleOpenCreate = () => {
     resetForm();
+    if (pedidos.length > 0) {
+      setPedidoId(pedidos[0].id);
+    }
     setModalVisible(true);
   };
 

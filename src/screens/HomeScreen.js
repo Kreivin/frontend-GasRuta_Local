@@ -9,10 +9,12 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { CartContext } from "../context/CartContext";
 import { ProductContext } from "../context/ProductContext";
+import { AuthContext } from "../context/AuthContext";
 
 export default function HomeScreen({ navigation }) {
   const { cart, addToCart } = useContext(CartContext);
   const { products } = useContext(ProductContext);
+  const { currentUser } = useContext(AuthContext);
 
   const totalItems = cart.reduce(
     (sum, item) => sum + item.qty,
@@ -36,12 +38,15 @@ export default function HomeScreen({ navigation }) {
           {/* HEADER */}
           <View style={styles.headerRow}>
             <View>
+              <Text style={{ fontSize: 13, fontWeight: "700", color: "#FF6B00", marginBottom: 2 }}>
+                👋 ¡Hola, {currentUser?.Nombre ? currentUser.Nombre.split(" ")[0] : "Cliente"}!
+              </Text>
               <Text style={styles.locationLabel}>
                 UBICACIÓN
               </Text>
 
               <Text style={styles.location}>
-                📍 Juigalpa, Chontales
+                📍 {currentUser?.Direccion || "Juigalpa, Chontales"}
               </Text>
             </View>
 

@@ -12,14 +12,18 @@ import DeliveryScreen from "./src/screens/DeliveryScreen";
 import OrderStatusScreen from "./src/screens/OrderStatusScreen";
 import RutaScreen from "./src/screens/RutaScreen";
 import ResenaScreen from "./src/screens/ResenaScreen";
-
+import IncidenciaScreen from "./src/screens/IncidenciaScreen";
 import VistaAdminScreen from "./src/screens/VistaAdminScreen";
 import NuevoProductoScreen from "./src/screens/NuevoProductoScreen";
 
+import { AuthProvider } from "./src/context/AuthContext";
 import { CartProvider } from "./src/context/CartContext";
 import { ProductProvider } from "./src/context/ProductContext";
+import { PedidoProvider } from "./src/context/PedidoContext";
 import { RutaProvider } from "./src/context/RutaContext";
 import { ResenaProvider } from "./src/context/ResenaContext";
+import { IncidenciaProvider } from "./src/context/IncidenciaContext";
+import { HistorialProvider } from "./src/context/HistorialContext";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -35,10 +39,13 @@ function AdminStack() {
         name="VistaAdmin"
         component={VistaAdminScreen}
       />
-
       <Stack.Screen
         name="NuevoProducto"
         component={NuevoProductoScreen}
+      />
+      <Stack.Screen
+        name="IncidenciaAdmin"
+        component={IncidenciaScreen}
       />
     </Stack.Navigator>
   );
@@ -56,38 +63,14 @@ function MainTabs() {
       <Tab.Screen
         name="Catálogo"
         component={HomeScreen}
-        // Bloquea la navegación si estás dentro de Admin
-        listeners={({ navigation }) => ({
-          tabPress: (e) => {
-            const state = navigation.getState();
-            const currentRouteName = state?.routes[state.index]?.name;
-            if (currentRouteName === "Admin") {
-              e.preventDefault();
-            }
-          },
-        })}
-        // Reduce la opacidad visualmente cuando el Admin está activo
-        options={({ navigation }) => {
-          const state = navigation.getState();
-          const currentRouteName = state?.routes[state.index]?.name;
-          const isAdminActive = currentRouteName === "Admin";
-          return {
-            tabBarItemStyle: isAdminActive ? { opacity: 0.4 } : {},
-            tabBarIcon: ({ size, focused }) => (
-              <Image
-                source={{
-                  uri: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRZjFTQ_ArJQoQViRAJpxC4LpQJqu71lbzxAQBhL172AQ&s=10",
-                }}
-                style={{
-                  width: size ? size + 4 : 28,
-                  height: size ? size + 4 : 28,
-                  borderRadius: (size ? size + 4 : 28) / 2,
-                  opacity: focused ? 1 : 0.65,
-                }}
-                resizeMode="contain"
-              />
-            ),
-          };
+        options={{
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons
+              name={focused ? "flame" : "flame-outline"}
+              size={size || 24}
+              color={focused ? "#FF6B00" : color}
+            />
+          ),
         }}
       />
 
@@ -145,51 +128,58 @@ export default function App() {
   return (
     <View style={styles.webContainer}>
       <View style={styles.phoneContainer}>
-        <ProductProvider>
-          <RutaProvider>
-            <ResenaProvider>
-              <CartProvider>
-                <NavigationContainer>
-                  <Stack.Navigator
-                    screenOptions={{
-                      headerShown: false,
-                    }}
-                  >
-                    <Stack.Screen
-                      name="Login"
-                      component={LoginScreen}
-                    />
-
-                    <Stack.Screen
-                      name="MainTabs"
-                      component={MainTabs}
-                    />
-
-                    <Stack.Screen
-                      name="Cart"
-                      component={CartScreen}
-                    />
-
-                    <Stack.Screen
-                      name="Delivery"
-                      component={DeliveryScreen}
-                    />
-
-                    <Stack.Screen
-                      name="OrderStatus"
-                      component={OrderStatusScreen}
-                    />
-
-                    <Stack.Screen
-                      name="Resena"
-                      component={ResenaScreen}
-                    />
-                  </Stack.Navigator>
-                </NavigationContainer>
-              </CartProvider>
-            </ResenaProvider>
-          </RutaProvider>
-        </ProductProvider>
+        <AuthProvider>
+          <ProductProvider>
+            <PedidoProvider>
+              <RutaProvider>
+                <ResenaProvider>
+                  <IncidenciaProvider>
+                    <HistorialProvider>
+                      <CartProvider>
+                        <NavigationContainer>
+                          <Stack.Navigator
+                            screenOptions={{
+                              headerShown: false,
+                            }}
+                          >
+                            <Stack.Screen
+                              name="Login"
+                              component={LoginScreen}
+                            />
+                            <Stack.Screen
+                              name="MainTabs"
+                              component={MainTabs}
+                            />
+                            <Stack.Screen
+                              name="Cart"
+                              component={CartScreen}
+                            />
+                            <Stack.Screen
+                              name="Delivery"
+                              component={DeliveryScreen}
+                            />
+                            <Stack.Screen
+                              name="OrderStatus"
+                              component={OrderStatusScreen}
+                            />
+                            <Stack.Screen
+                              name="Resena"
+                              component={ResenaScreen}
+                            />
+                            <Stack.Screen
+                              name="Incidencia"
+                              component={IncidenciaScreen}
+                            />
+                          </Stack.Navigator>
+                        </NavigationContainer>
+                      </CartProvider>
+                    </HistorialProvider>
+                  </IncidenciaProvider>
+                </ResenaProvider>
+              </RutaProvider>
+            </PedidoProvider>
+          </ProductProvider>
+        </AuthProvider>
       </View>
     </View>
   );

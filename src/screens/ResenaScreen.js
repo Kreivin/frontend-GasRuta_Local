@@ -14,13 +14,15 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 
 import { ResenaContext } from "../context/ResenaContext";
+import { AuthContext } from "../context/AuthContext";
 import colors from "../theme/color";
 
 export default function ResenaScreen({ navigation, route }) {
   const { resenas, loading, error, agregarResena, editarResena, borrarResena, cargarResenas } =
     useContext(ResenaContext);
+  const { currentUser } = useContext(AuthContext);
 
-  const defaultClienteId = route.params?.clienteId || "MFSECY3Z1K6X3JePUdO5";
+  const defaultClienteId = route.params?.clienteId || currentUser?.id || "dehkUp2gjgVT0piTBKfX";
   const defaultPedidoId = route.params?.pedidoId || "NTiOxIHiRc8ZXWxcmVfR";
   const defaultRepartidorId = route.params?.repartidorId || "SPk4vMRTErAtvsg23WHa";
 
