@@ -15,6 +15,8 @@ import ResenaScreen from "./src/screens/ResenaScreen";
 import IncidenciaScreen from "./src/screens/IncidenciaScreen";
 import VistaAdminScreen from "./src/screens/VistaAdminScreen";
 import NuevoProductoScreen from "./src/screens/NuevoProductoScreen";
+import PerfilScreen from "./src/screens/PerfilScreen";
+import PerfilAdminScreen from "./src/screens/PerfilAdminScreen";
 
 import { AuthProvider } from "./src/context/AuthContext";
 import { CartProvider } from "./src/context/CartContext";
@@ -46,6 +48,11 @@ function AdminStack() {
       <Stack.Screen
         name="IncidenciaAdmin"
         component={IncidenciaScreen}
+      />
+      {/* Pantalla de perfil del administrador con opción de cerrar sesión */}
+      <Stack.Screen
+        name="PerfilAdmin"
+        component={PerfilAdminScreen}
       />
     </Stack.Navigator>
   );
@@ -95,6 +102,21 @@ function MainTabs() {
           tabBarIcon: ({ size, color, focused }) => (
             <Ionicons
               name={focused ? "chatbubble-ellipses" : "chatbubble-ellipses-outline"}
+              size={size || 24}
+              color={color}
+            />
+          ),
+        }}
+      />
+
+      {/* Pestaña de Mi Perfil para el cliente / repartidor */}
+      <Tab.Screen
+        name="Perfil"
+        component={PerfilScreen}
+        options={{
+          tabBarIcon: ({ size, color, focused }) => (
+            <Ionicons
+              name={focused ? "person" : "person-outline"}
               size={size || 24}
               color={color}
             />
