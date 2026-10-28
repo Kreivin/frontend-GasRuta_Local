@@ -101,6 +101,36 @@ export function RutaProvider({ children }) {
     }
   }, []);
 
+  // Actualizar ubicación en tiempo real
+  const actualizarUbicacion = useCallback(async (rutaId, coords) => {
+    if (!rutaService?.actualizarUbicacionRuta) {
+      setError("Firebase no está configurado.");
+      throw new Error("Firebase no está configurado.");
+    }
+    try {
+      await rutaService.actualizarUbicacionRuta(rutaId, coords);
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    }
+  }, []);
+
+  // Escuchar ubicación de una ruta en tiempo real
+  const escucharUbicacion = useCallback((rutaId, callback) => {
+    if (!rutaService?.escucharUbicacionRuta) {
+      return () => {};
+    }
+    return rutaService.escucharUbicacionRuta(rutaId, callback);
+  }, []);
+
+  // Iniciar rastreo con expo-location para el repartidor
+  const iniciarRastreo = useCallback(async (rutaId, onUpdate) => {
+    if (!rutaService?.iniciarRastreoRepartidor) {
+      throw new Error("Servicio de rastreo no disponible.");
+    }
+    return await rutaService.iniciarRastreoRepartidor(rutaId, onUpdate);
+  }, []);
+
   return (
     <RutaContext.Provider
       value={{
@@ -111,6 +141,12 @@ export function RutaProvider({ children }) {
         agregarRuta,
         editarRuta,
         borrarRuta,
+        actualizarUbicacion,
+        escucharUbicacion,
+        iniciarRastreo,
+        abrirNavegacionGoogleMaps: rutaService?.abrirNavegacionGoogleMaps,
+        abrirEnGoogleMaps: rutaService?.abrirEnGoogleMaps,
+        compartirUbicacionWhatsApp: rutaService?.compartirUbicacionWhatsApp,
       }}
     >
       {children}

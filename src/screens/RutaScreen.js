@@ -203,6 +203,12 @@ export default function RutaScreen({ navigation }) {
                       Pedido: {ruta.pedidoId || "N/A"}
                     </Text>
                   </View>
+                  {ruta.ubicacion_actual && (
+                    <View style={styles.gpsBadge}>
+                      <View style={styles.gpsDot} />
+                      <Text style={styles.gpsBadgeText}>GPS</Text>
+                    </View>
+                  )}
                 </View>
 
                 {/* Detalles */}
@@ -235,6 +241,21 @@ export default function RutaScreen({ navigation }) {
                     </Text>
                   </View>
                 </View>
+
+                {/* Botón principal de seguimiento y Google Maps */}
+                <TouchableOpacity
+                  style={styles.mapBtn}
+                  onPress={() =>
+                    navigation.navigate("MapaSeguimiento", {
+                      rutaId: ruta.id,
+                      pedidoId: ruta.pedidoId,
+                      destino: ruta.ruta_asignada,
+                      esRepartidor: true,
+                    })
+                  }
+                >
+                  <Text style={styles.mapBtnText}>📍 Google Maps en Vivo</Text>
+                </TouchableOpacity>
 
                 {/* Acciones */}
                 <View style={styles.cardActions}>
@@ -499,6 +520,47 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     maxWidth: "55%",
     textAlign: "right",
+  },
+
+  // Badge GPS
+  gpsBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#E6F4EA",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#CEEAD6",
+  },
+  gpsDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#1E8E3E",
+    marginRight: 4,
+  },
+  gpsBadgeText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#1E8E3E",
+    letterSpacing: 0.5,
+  },
+
+  // Botón mapa
+  mapBtn: {
+    backgroundColor: "#FFF3EB",
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    paddingVertical: 12,
+    borderRadius: 14,
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  mapBtnText: {
+    color: colors.primary,
+    fontWeight: "700",
+    fontSize: 14,
   },
 
   // Acciones de la tarjeta

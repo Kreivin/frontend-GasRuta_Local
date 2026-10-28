@@ -116,12 +116,13 @@ export default function OrderStatusScreen({
       `Tu pedido #${pedidoIdFinal ? pedidoIdFinal.slice(0, 6) : "GR"} está en camino 🛵\n¿Deseas calificar tu experiencia?`,
       [
         {
-          text: "Inicio",
+          text: "📍 Rastrear en Mapa",
           onPress: () => {
             clearCart();
-            navigation.reset({
-              index: 0,
-              routes: [{ name: "MainTabs" }],
+            navigation.navigate("MapaSeguimiento", {
+              pedidoId: pedidoIdFinal,
+              destino: address,
+              esRepartidor: false,
             });
           },
         },
@@ -133,6 +134,16 @@ export default function OrderStatusScreen({
               pedidoId: pedidoIdFinal || "NTiOxIHiRc8ZXWxcmVfR",
               clienteId: currentUser?.id || "dehkUp2gjgVT0piTBKfX",
               repartidorId: "SPk4vMRTErAtvsg23WHa",
+            });
+          },
+        },
+        {
+          text: "Inicio",
+          onPress: () => {
+            clearCart();
+            navigation.reset({
+              index: 0,
+              routes: [{ name: "MainTabs" }],
             });
           },
         },

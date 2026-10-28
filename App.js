@@ -17,6 +17,7 @@ import VistaAdminScreen from "./src/screens/VistaAdminScreen";
 import NuevoProductoScreen from "./src/screens/NuevoProductoScreen";
 import PerfilScreen from "./src/screens/PerfilScreen";
 import PerfilAdminScreen from "./src/screens/PerfilAdminScreen";
+import MapaSeguimientoScreen from "./src/screens/MapaSeguimientoScreen";
 
 import { AuthProvider } from "./src/context/AuthContext";
 import { CartProvider } from "./src/context/CartContext";
@@ -191,6 +192,10 @@ export default function App() {
                             <Stack.Screen
                               name="Incidencia"
                               component={IncidenciaScreen}
+                            />
+                            <Stack.Screen
+                              name="MapaSeguimiento"
+                              component={MapaSeguimientoScreen}
                             />
                           </Stack.Navigator>
                         </NavigationContainer>
