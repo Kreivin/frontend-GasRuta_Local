@@ -1,21 +1,58 @@
-// Configuración de Firebase para el proyecto GasRuta
-import { initializeApp, getApps } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+// Configuración del cliente Firebase para GasRuta Local
 
-// Credenciales del proyecto Firebase del usuario: gasruta-local-b7acb
+import {
+  initializeApp,
+  getApps,
+} from "firebase/app";
+
+import {
+  getAuth,
+} from "firebase/auth";
+
+// Firestore se conserva por compatibilidad temporal.
+// Las consultas nuevas deben pasar por el backend.
+import {
+  getFirestore,
+} from "firebase/firestore";
+
 const firebaseConfig = {
-  apiKey: "AIzaSyABG5P0wXki2H4uC6wsw39kguh5qmF6I4g",
-  authDomain: "gasruta-local-b7acb.firebaseapp.com",
-  projectId: "gasruta-local-b7acb",
-  storageBucket: "gasruta-local-b7acb.firebasestorage.app",
-  messagingSenderId: "545489309357",
-  appId: "1:545489309357:web:cd29a826ee358de8708024",
+  apiKey:
+    process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
+
+  authDomain:
+    process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
+
+  projectId:
+    process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
+
+  storageBucket:
+    process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
+
+  messagingSenderId:
+    process.env
+      .EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+
+  appId:
+    process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
 };
 
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApps()[0];
+// Evitar inicializar Firebase más de una vez
+const app =
+  getApps().length === 0
+    ? initializeApp(firebaseConfig)
+    : getApps()[0];
 
-// Importante: La base de datos creada en este proyecto tiene ID 'default' (sin paréntesis)
+// Firebase Authentication para iniciar sesión
+const auth = getAuth(app);
+
+// Compatibilidad temporal con código antiguo.
+// La base tiene el ID "default", sin paréntesis.
 const db = getFirestore(app, "default");
 
-export { db, app };
+export {
+  app,
+  auth,
+  db,
+};
+
 export default app;

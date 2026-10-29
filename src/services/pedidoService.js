@@ -1,35 +1,8 @@
-// Servicio CRUD para la entidad Pedido en Firestore
-// Colección: "Pedido"
-// Campos:
-//   - Id_Usuario (referencia a documento en colección Usuario)
-//   - Producto (map: { nombre, presentacion, pesoKg, precio })
-//   - Ubicacion (map: { direccion, referencia })
-//   - cantidad (number)
-//   - costoEnvio (number)
-//   - subtotal (number)
-//   - total (number)
-//   - estado (string: "pendiente" | "confirmado" | "en_preparacion" | "en_camino" | "entregado" | "cancelado")
-//   - fecha (timestamp)
-//   - fechaActualizacion (timestamp)
+import api from "./api";
 
-import {
-  collection,
-  doc,
-  addDoc,
-  getDoc,
-  getDocs,
-  updateDoc,
-  deleteDoc,
-  query,
-  where,
-  orderBy,
-  onSnapshot,
-  Timestamp,
-} from "firebase/firestore";
-import { db } from "./firebaseConfig.js";
-
-const PEDIDO_COLLECTION = "Pedido";
-const HISTORIAL_COLLECTION = "Historial";
+// =========================
+// Estados disponibles
+// =========================
 
 export const ESTADOS_PEDIDO = [
   "pendiente",
@@ -40,6 +13,10 @@ export const ESTADOS_PEDIDO = [
   "cancelado",
 ];
 
+// =========================
+// Cilindros disponibles
+// =========================
+
 export const CILINDROS_DISPONIBLES = {
   5: {
     nombre: "Cilindro de gas",
@@ -47,18 +24,21 @@ export const CILINDROS_DISPONIBLES = {
     pesoKg: 5,
     precio: 200,
   },
+
   10: {
     nombre: "Cilindro de gas",
     presentacion: "Mediano",
     pesoKg: 10,
     precio: 480,
   },
+
   15: {
     nombre: "Cilindro de gas",
     presentacion: "Grande",
     pesoKg: 15,
     precio: 700,
   },
+
   45: {
     nombre: "Cilindro de gas",
     presentacion: "Industrial",
@@ -67,201 +47,475 @@ export const CILINDROS_DISPONIBLES = {
   },
 };
 
-/**
- * Formatea un documento Firestore de pedido a un objeto amigable para la app
- */
-export function formatearPedidoDoc(docSnap) {
-  const data = docSnap.data();
+// =========================
+// Formatear fecha
+// =========================
+
+const formatearFecha = (valor) => {
+  if (!valor) {
+    return null;
+  }
+
+  // El backend normalmente devuelve texto ISO
+  if (typeof valor === "string") {
+    const fecha = new Date(valor);
+
+    return Number.isNaN(fecha.getTime())
+      ? valor
+      : fecha.toLocaleString("es-NI");
+  }
+
+  // Compatibilidad con Timestamp serializado
+  if (
+    typeof valor === "object" &&
+    valor._seconds !== undefined
+  ) {
+    const fecha = new Date(
+      valor._seconds * 1000
+    );
+
+    return fecha.toLocaleString("es-NI");
+  }
+
+  // Compatibilidad temporal con Firestore directo
+  if (typeof valor.toDate === "function") {
+    return valor
+      .toDate()
+      .toLocaleString("es-NI");
+  }
+
+  return String(valor);
+};
+
+// =========================
+// Normalizar pedido
+// =========================
+
+export function formatearPedidoDoc(pedido) {
+  if (!pedido) {
+    return null;
+  }
+
   return {
-    id: docSnap.id,
-    ...data,
-    usuarioId: data.Id_Usuario?.id || (typeof data.Id_Usuario === "string" ? data.Id_Usuario : null),
-    fechaFormateada: data.fecha?.toDate ? data.fecha.toDate().toLocaleString() : data.fecha,
-    fechaActualizacionFormateada: data.fechaActualizacion?.toDate
-      ? data.fechaActualizacion.toDate().toLocaleString()
-      : data.fechaActualizacion,
+    id: pedido.id,
+
+    // El backend ya convierte la referencia en ID
+    usuarioId:
+      pedido.usuarioId ||
+      pedido.Id_Usuario ||
+      null,
+
+    Id_Usuario:
+      pedido.Id_Usuario ||
+      pedido.usuarioId ||
+      null,
+
+    Producto:
+      pedido.Producto ||
+      pedido.producto ||
+      null,
+
+    Ubicacion:
+      pedido.Ubicacion ||
+      pedido.ubicacion ||
+      null,
+
+    cantidad:
+      Number(pedido.cantidad) || 0,
+
+    costoEnvio:
+      Number(pedido.costoEnvio) || 0,
+
+    subtotal:
+      Number(pedido.subtotal) || 0,
+
+    total:
+      Number(pedido.total) || 0,
+
+    estado:
+      pedido.estado || "pendiente",
+
+    fecha:
+      pedido.fecha || null,
+
+    fechaActualizacion:
+      pedido.fechaActualizacion || null,
+
+    fechaFormateada:
+      formatearFecha(pedido.fecha),
+
+    fechaActualizacionFormateada:
+      formatearFecha(
+        pedido.fechaActualizacion
+      ),
   };
 }
 
-/**
- * Crear un nuevo pedido
- */
+// =========================
+// Crear pedido
+// =========================
+
 export async function crearPedido(pedidoData) {
   try {
-    const usuarioRef = doc(db, "Usuario", pedidoData.usuarioId);
-    const pesoKg = Number(pedidoData.pesoKg) || 10;
-    const cantidad = Number(pedidoData.cantidad) || 1;
-    const costoEnvio = Number(pedidoData.costoEnvio) || 50;
+    const pesoKg = Number(
+      pedidoData.pesoKg
+    );
 
-    const productoInfo = pedidoData.producto || CILINDROS_DISPONIBLES[pesoKg] || {
-      nombre: "Cilindro de gas",
-      presentacion: `${pesoKg} kg`,
-      pesoKg,
-      precio: 480,
-    };
+    const cantidad = Number(
+      pedidoData.cantidad
+    );
 
-    const subtotal = pedidoData.subtotal !== undefined ? Number(pedidoData.subtotal) : productoInfo.precio * cantidad;
-    const total = subtotal + costoEnvio;
+    const costoEnvio = Number(
+      pedidoData.costoEnvio ?? 0
+    );
 
-    const nuevoPedidoDoc = {
-      Id_Usuario: usuarioRef,
-      Producto: {
-        nombre: productoInfo.nombre,
-        presentacion: productoInfo.presentacion,
-        pesoKg: productoInfo.pesoKg,
-        precio: productoInfo.precio,
-      },
-      Ubicacion: {
-        direccion: pedidoData.direccion || "Juigalpa, Chontales",
-        referencia: pedidoData.referencia || "",
-      },
-      cantidad,
-      costoEnvio,
-      subtotal,
-      total,
-      estado: "pendiente",
-      fecha: Timestamp.now(),
-      fechaActualizacion: Timestamp.now(),
-    };
-
-    const docRef = await addDoc(collection(db, PEDIDO_COLLECTION), nuevoPedidoDoc);
-
-    // Registro automático en Historial
-    try {
-      await addDoc(collection(db, HISTORIAL_COLLECTION), {
-        id_usuario: usuarioRef,
-        id_pedido: docRef,
-        accion: "pedido_creado",
-        estado: "pendiente",
-        descripcio: `Nuevo pedido de cilindro ${productoInfo.presentacion} (${pesoKg}kg) registrado.`,
-        fecha_entrega: null,
-        fechaActualizacion: Timestamp.now(),
-      });
-    } catch (hErr) {
-      console.warn("No se pudo registrar historial automático:", hErr.message);
+    if (!pedidoData.usuarioId) {
+      throw new Error(
+        "No se encontró el usuario del pedido."
+      );
     }
 
-    return { id: docRef.id, ...nuevoPedidoDoc };
+    if (
+      !CILINDROS_DISPONIBLES[pesoKg]
+    ) {
+      throw new Error(
+        "El peso seleccionado no está disponible."
+      );
+    }
+
+    if (
+      !Number.isInteger(cantidad) ||
+      cantidad <= 0
+    ) {
+      throw new Error(
+        "La cantidad debe ser mayor que cero."
+      );
+    }
+
+    const datosBackend = {
+      usuarioId: pedidoData.usuarioId,
+      pesoKg,
+      cantidad,
+
+      direccion:
+        pedidoData.direccion ||
+        pedidoData.Ubicacion?.direccion ||
+        "Juigalpa, Chontales",
+
+      referencia:
+        pedidoData.referencia ||
+        pedidoData.Ubicacion?.referencia ||
+        "",
+
+      costoEnvio,
+    };
+
+    const respuesta = await api.post(
+      "/pedidos",
+      datosBackend
+    );
+
+    /*
+     * El backend responde:
+     * {
+     *   mensaje,
+     *   id,
+     *   pedido
+     * }
+     */
+    return formatearPedidoDoc({
+      id: respuesta.data.id,
+      ...respuesta.data.pedido,
+    });
   } catch (error) {
-    console.error("Error al crear pedido:", error);
+    console.error(
+      "Error al crear pedido:",
+      error.response?.data ||
+        error.message
+    );
+
     throw error;
   }
 }
 
-/**
- * Obtener todos los pedidos
- */
+// =========================
+// Obtener todos los pedidos
+// =========================
+
 export async function obtenerPedidos() {
   try {
-    const querySnapshot = await getDocs(collection(db, PEDIDO_COLLECTION));
-    const pedidos = [];
-    querySnapshot.forEach((docSnap) => {
-      pedidos.push(formatearPedidoDoc(docSnap));
-    });
-    return pedidos;
+    const respuesta = await api.get(
+      "/pedidos"
+    );
+
+    const datos = Array.isArray(
+      respuesta.data
+    )
+      ? respuesta.data
+      : [];
+
+    return datos.map(
+      formatearPedidoDoc
+    );
   } catch (error) {
-    console.error("Error al obtener pedidos:", error);
+    console.error(
+      "Error al obtener pedidos:",
+      error.response?.data ||
+        error.message
+    );
+
     throw error;
   }
 }
 
-/**
- * Obtener pedido por ID
- */
+// Alias para compatibilidad
+export const obtenerTodosLosPedidos =
+  obtenerPedidos;
+
+// =========================
+// Obtener pedido por ID
+// =========================
+
 export async function obtenerPedido(id) {
   try {
-    const docRef = doc(db, PEDIDO_COLLECTION, id);
-    const docSnap = await getDoc(docRef);
-    if (docSnap.exists()) {
-      return formatearPedidoDoc(docSnap);
-    }
-    return null;
-  } catch (error) {
-    console.error("Error al obtener pedido:", error);
-    throw error;
-  }
-}
-
-/**
- * Obtener pedidos de un usuario específico
- */
-export async function obtenerPedidosUsuario(usuarioId) {
-  try {
-    const usuarioRef = doc(db, "Usuario", usuarioId);
-    const q = query(
-      collection(db, PEDIDO_COLLECTION),
-      where("Id_Usuario", "==", usuarioRef)
+    const respuesta = await api.get(
+      `/pedidos/${id}`
     );
-    const querySnapshot = await getDocs(q);
-    const pedidos = [];
-    querySnapshot.forEach((docSnap) => {
-      pedidos.push(formatearPedidoDoc(docSnap));
-    });
-    return pedidos;
+
+    return formatearPedidoDoc(
+      respuesta.data
+    );
   } catch (error) {
-    console.error("Error al obtener pedidos del usuario:", error);
-    throw error;
-  }
-}
-
-/**
- * Actualizar el estado de un pedido
- */
-export async function actualizarEstadoPedido(id, nuevoEstado, usuarioId = null) {
-  try {
-    const pedidoRef = doc(db, PEDIDO_COLLECTION, id);
-    await updateDoc(pedidoRef, {
-      estado: nuevoEstado,
-      fechaActualizacion: Timestamp.now(),
-    });
-
-    // Registrar cambio en Historial
-    try {
-      const uRef = usuarioId ? doc(db, "Usuario", usuarioId) : null;
-      await addDoc(collection(db, HISTORIAL_COLLECTION), {
-        id_usuario: uRef,
-        id_pedido: pedidoRef,
-        accion: `estado_${nuevoEstado}`,
-        estado: nuevoEstado,
-        descripcio: `El pedido cambió a estado: ${nuevoEstado}`,
-        fecha_entrega: nuevoEstado === "entregado" ? Timestamp.now() : null,
-        fechaActualizacion: Timestamp.now(),
-      });
-    } catch (hErr) {
-      console.warn("No se pudo registrar cambio en historial:", hErr.message);
+    if (error.response?.status === 404) {
+      return null;
     }
 
-    return true;
-  } catch (error) {
-    console.error("Error al actualizar estado del pedido:", error);
+    console.error(
+      "Error al obtener pedido:",
+      error.response?.data ||
+        error.message
+    );
+
     throw error;
   }
 }
 
-/**
- * Eliminar un pedido
- */
+// =========================
+// Obtener pedidos de usuario
+// =========================
+
+export async function obtenerPedidosUsuario(
+  usuarioId
+) {
+  try {
+    if (!usuarioId) {
+      throw new Error(
+        "El ID del usuario es obligatorio."
+      );
+    }
+
+    const respuesta = await api.get(
+      `/pedidos/usuario/${usuarioId}`
+    );
+
+    const datos = Array.isArray(
+      respuesta.data
+    )
+      ? respuesta.data
+      : [];
+
+    return datos.map(
+      formatearPedidoDoc
+    );
+  } catch (error) {
+    console.error(
+      "Error al obtener pedidos del usuario:",
+      error.response?.data ||
+        error.message
+    );
+
+    throw error;
+  }
+}
+
+// =========================
+// Actualizar pedido completo
+// =========================
+
+export async function actualizarPedido(
+  id,
+  datosActualizados
+) {
+  try {
+    const datosBackend = {};
+
+    if (
+      datosActualizados.pesoKg !== undefined
+    ) {
+      datosBackend.pesoKg = Number(
+        datosActualizados.pesoKg
+      );
+    }
+
+    if (
+      datosActualizados.cantidad !== undefined
+    ) {
+      datosBackend.cantidad = Number(
+        datosActualizados.cantidad
+      );
+    }
+
+    if (
+      datosActualizados.costoEnvio !==
+      undefined
+    ) {
+      datosBackend.costoEnvio = Number(
+        datosActualizados.costoEnvio
+      );
+    }
+
+    if (
+      datosActualizados.direccion !==
+      undefined
+    ) {
+      datosBackend.direccion =
+        datosActualizados.direccion;
+    }
+
+    if (
+      datosActualizados.referencia !==
+      undefined
+    ) {
+      datosBackend.referencia =
+        datosActualizados.referencia;
+    }
+
+    const respuesta = await api.patch(
+      `/pedidos/${id}`,
+      datosBackend
+    );
+
+    return formatearPedidoDoc(
+      respuesta.data.pedido
+    );
+  } catch (error) {
+    console.error(
+      "Error al actualizar pedido:",
+      error.response?.data ||
+        error.message
+    );
+
+    throw error;
+  }
+}
+
+// =========================
+// Actualizar estado
+// =========================
+
+export async function actualizarEstadoPedido(
+  id,
+  nuevoEstado
+) {
+  try {
+    if (
+      !ESTADOS_PEDIDO.includes(
+        nuevoEstado
+      )
+    ) {
+      throw new Error(
+        "El estado seleccionado no es válido."
+      );
+    }
+
+    const respuesta = await api.patch(
+      `/pedidos/${id}/estado`,
+      {
+        estado: nuevoEstado,
+      }
+    );
+
+    return respuesta.data;
+  } catch (error) {
+    console.error(
+      "Error al actualizar estado:",
+      error.response?.data ||
+        error.message
+    );
+
+    throw error;
+  }
+}
+
+// =========================
+// Eliminar pedido
+// =========================
+
 export async function eliminarPedido(id) {
   try {
-    const docRef = doc(db, PEDIDO_COLLECTION, id);
-    await deleteDoc(docRef);
-    return true;
+    const respuesta = await api.delete(
+      `/pedidos/${id}`
+    );
+
+    return respuesta.data;
   } catch (error) {
-    console.error("Error al eliminar pedido:", error);
+    console.error(
+      "Error al eliminar pedido:",
+      error.response?.data ||
+        error.message
+    );
+
     throw error;
   }
 }
 
-/**
- * Escuchar cambios en tiempo real de todos los pedidos
+// =========================
+// Compatibilidad temporal
+// =========================
+
+/*
+ * Antes escucharPedidos utilizaba onSnapshot.
+ * Ahora el frontend no se conecta directamente
+ * a Firestore.
+ *
+ * Para no romper PedidoContext, esta función
+ * realiza una consulta inicial y repite la
+ * consulta cada 15 segundos.
  */
-export function escucharPedidos(callback) {
-  const q = collection(db, PEDIDO_COLLECTION);
-  return onSnapshot(q, (snapshot) => {
-    const pedidos = [];
-    snapshot.forEach((docSnap) => {
-      pedidos.push(formatearPedidoDoc(docSnap));
-    });
-    callback(pedidos);
-  });
+export function escucharPedidos(
+  callback,
+  callbackError
+) {
+  let activo = true;
+
+  const cargar = async () => {
+    try {
+      const pedidos =
+        await obtenerPedidos();
+
+      if (activo) {
+        callback(pedidos);
+      }
+    } catch (error) {
+      if (
+        activo &&
+        typeof callbackError === "function"
+      ) {
+        callbackError(error);
+      }
+    }
+  };
+
+  cargar();
+
+  const intervalo = setInterval(
+    cargar,
+    15000
+  );
+
+  // Función equivalente a unsubscribe
+  return () => {
+    activo = false;
+    clearInterval(intervalo);
+  };
 }
