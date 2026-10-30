@@ -22,7 +22,13 @@ export default function VistaAdminScreen({ navigation }) {
   const { pedidos, cambiarEstado, borrarPedido } = useContext(PedidoContext);
   const { incidencias, cambiarEstadoIncidencia } = useContext(IncidenciaContext);
   const { historial } = useContext(HistorialContext);
-  const { usuarios, currentUser, seleccionarUsuario } = useContext(AuthContext);
+  const {
+    usuarios,
+    currentUser,
+    cargarUsuarios,
+    loading: usuariosLoading,
+    error: usuariosError,
+  } = useContext(AuthContext);
 
   const [seccionActiva, setSeccionActiva] = useState("productos"); // productos | pedidos | incidencias | historial | usuarios
 
@@ -326,35 +332,195 @@ export default function VistaAdminScreen({ navigation }) {
         )}
 
         {/* SECCIÓN 5: USUARIOS */}
-        {seccionActiva === "usuarios" && (
-          <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
-            {usuarios.map((u) => (
-              <View key={u.id} style={styles.card}>
-                <View style={styles.cardHeaderRow}>
-                  <Text style={styles.nombre}>{u.Nombre || u.Correo}</Text>
-                  <View style={styles.statusPill}>
-                    <Text style={styles.statusPillText}>{u.Rol || "Cliente"}</Text>
-                  </View>
-                </View>
-                <Text style={styles.descripcion}>✉️ {u.Correo}</Text>
-                <Text style={styles.descripcion}>📞 {u.Telefono || "Sin teléfono"}</Text>
-                <Text style={styles.descripcion}>📍 {u.Direccion || "Sin dirección"}</Text>
+{seccionActiva === "usuarios" && (
+  <ScrollView
+    showsVerticalScrollIndicator={false}
+    style={{ flex: 1 }}
+    contentContainerStyle={{
+      paddingBottom: 20,
+    }}
+  >
+    <TouchableOpacity
+      style={styles.refreshUsersButton}
+      onPress={cargarUsuarios}
+      disabled={usuariosLoading}
+    >
+      {usuariosLoading ? (
+        <ActivityIndicator
+          color="#FFFFFF"
+          size="small"
+        />
+      ) : (
+        <>
+          <Ionicons
+            name="refresh-outline"
+            size={18}
+            color="#FFFFFF"
+          />
 
-                <TouchableOpacity
-                  style={[styles.editButton, { marginTop: 10, alignSelf: "flex-start" }]}
-                  onPress={() => {
-                    seleccionarUsuario(u);
-                    Alert.alert("Usuario Activo", `Ahora estás usando la sesión de ${u.Nombre}`);
-                  }}
-                >
-                  <Text style={styles.buttonText}>
-                    {currentUser?.id === u.id ? "✓ Usuario Activo" : "Usar este Usuario"}
+          <Text style={styles.refreshUsersText}>
+            Actualizar usuarios
+          </Text>
+        </>
+      )}
+    </TouchableOpacity>
+
+    {usuariosError ? (
+      <View style={styles.userErrorBanner}>
+        <Text style={styles.userErrorText}>
+          {usuariosError}
+        </Text>
+      </View>
+    ) : null}
+
+    {!usuariosLoading &&
+    usuarios.length === 0 ? (
+      <View style={styles.emptyUsersContainer}>
+        <Ionicons
+          name="people-outline"
+          size={52}
+          color="#AAAAAA"
+        />
+
+        <Text style={styles.emptyUsersTitle}>
+          No hay usuarios
+        </Text>
+
+        <Text style={styles.emptyUsersText}>
+          No se encontraron perfiles registrados
+          en la colección Usuario.
+        </Text>
+      </View>
+    ) : (
+      usuarios.map((usuario) => {
+        const esUsuarioActual =
+          currentUser?.id === usuario.id ||
+          currentUser?.uid === usuario.uid;
+
+        return (
+          <View
+            key={usuario.id || usuario.uid}
+            style={styles.card}
+          >
+            <View style={styles.cardHeaderRow}>
+              <View style={styles.userTitleContainer}>
+                <View style={styles.userAvatar}>
+                  <Text style={styles.userAvatarText}>
+                    {usuario.Nombre
+                      ?.trim()
+                      ?.charAt(0)
+                      ?.toUpperCase() || "U"}
                   </Text>
-                </TouchableOpacity>
+                </View>
+
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.nombre}>
+                    {usuario.Nombre ||
+                      usuario.Correo ||
+                      "Usuario"}
+                  </Text>
+
+                  <Text style={styles.userKeyText}>
+                    {usuario.Usuariokey ||
+                      usuario.id ||
+                      "Sin código"}
+                  </Text>
+                </View>
               </View>
-            ))}
-          </ScrollView>
-        )}
+
+              <View style={styles.statusPill}>
+                <Text style={styles.statusPillText}>
+                  {usuario.Rol || "Cliente"}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.userInfoRow}>
+              <Ionicons
+                name="mail-outline"
+                size={17}
+                color="#666666"
+              />
+
+              <Text style={styles.descripcion}>
+                {usuario.Correo ||
+                  "Sin correo"}
+              </Text>
+            </View>
+
+            <View style={styles.userInfoRow}>
+              <Ionicons
+                name="call-outline"
+                size={17}
+                color="#666666"
+              />
+
+              <Text style={styles.descripcion}>
+                {usuario.Telefono ||
+                  "Sin teléfono"}
+              </Text>
+            </View>
+
+            <View style={styles.userInfoRow}>
+              <Ionicons
+                name="location-outline"
+                size={17}
+                color="#666666"
+              />
+
+              <Text style={styles.descripcion}>
+                {usuario.Direccion ||
+                  "Sin dirección"}
+              </Text>
+            </View>
+
+            <View
+              style={[
+                styles.usuarioEstado,
+                esUsuarioActual &&
+                  styles.usuarioActualEstado,
+              ]}
+            >
+              <Ionicons
+                name={
+                  esUsuarioActual
+                    ? "checkmark-circle"
+                    : usuario.activo === false
+                    ? "close-circle-outline"
+                    : "person-circle-outline"
+                }
+                size={17}
+                color={
+                  esUsuarioActual
+                    ? "#2E9B59"
+                    : usuario.activo === false
+                    ? "#D9534F"
+                    : "#777777"
+                }
+              />
+
+              <Text
+                style={[
+                  styles.usuarioEstadoTexto,
+                  esUsuarioActual &&
+                    styles.usuarioActualTexto,
+                  usuario.activo === false &&
+                    styles.usuarioInactivoTexto,
+                ]}
+              >
+                {esUsuarioActual
+                  ? "Sesión actual"
+                  : usuario.activo === false
+                  ? "Cuenta inactiva"
+                  : "Cuenta activa"}
+              </Text>
+            </View>
+          </View>
+        );
+      })
+    )}
+  </ScrollView>
+)}
       </View>
     </View>
   );
@@ -551,4 +717,147 @@ const styles = StyleSheet.create({
   stateOptionTextActive: {
     color: "#FFF",
   },
+
+  usuarioEstado: {
+  alignSelf: "flex-start",
+  flexDirection: "row",
+  alignItems: "center",
+  backgroundColor: "#F0F0F4",
+  paddingHorizontal: 11,
+  paddingVertical: 7,
+  borderRadius: 10,
+  marginTop: 10,
+  gap: 5,
+},
+
+usuarioActualEstado: {
+  backgroundColor: "#EAF8F0",
+},
+
+usuarioEstadoTexto: {
+  color: "#777777",
+  fontSize: 12,
+  fontWeight: "700",
+},
+
+usuarioActualTexto: {
+  color: "#2E9B59",
+},
+
+refreshUsersButton: {
+  minHeight: 46,
+  backgroundColor: "#1B1435",
+  borderRadius: 13,
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "center",
+  marginBottom: 14,
+  gap: 7,
+},
+
+refreshUsersText: {
+  color: "#FFFFFF",
+  fontSize: 14,
+  fontWeight: "700",
+},
+
+userErrorBanner: {
+  backgroundColor: "#FEE4E2",
+  borderRadius: 12,
+  padding: 12,
+  marginBottom: 12,
+},
+
+userErrorText: {
+  color: "#B42318",
+  fontSize: 13,
+},
+
+emptyUsersContainer: {
+  alignItems: "center",
+  justifyContent: "center",
+  paddingVertical: 60,
+  paddingHorizontal: 25,
+},
+
+emptyUsersTitle: {
+  color: "#333333",
+  fontSize: 19,
+  fontWeight: "700",
+  marginTop: 12,
+},
+
+emptyUsersText: {
+  color: "#888888",
+  fontSize: 14,
+  textAlign: "center",
+  marginTop: 6,
+},
+
+userTitleContainer: {
+  flex: 1,
+  flexDirection: "row",
+  alignItems: "center",
+  marginRight: 10,
+},
+
+userAvatar: {
+  width: 42,
+  height: 42,
+  borderRadius: 21,
+  backgroundColor: "#FFF3E6",
+  justifyContent: "center",
+  alignItems: "center",
+  marginRight: 10,
+},
+
+userAvatarText: {
+  color: "#FF6B00",
+  fontSize: 18,
+  fontWeight: "800",
+},
+
+userKeyText: {
+  color: "#999999",
+  fontSize: 11,
+  marginTop: 2,
+},
+
+userInfoRow: {
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 8,
+  marginTop: 7,
+},
+
+usuarioEstado: {
+  alignSelf: "flex-start",
+  flexDirection: "row",
+  alignItems: "center",
+  backgroundColor: "#F0F0F4",
+  paddingHorizontal: 11,
+  paddingVertical: 7,
+  borderRadius: 10,
+  marginTop: 12,
+  gap: 5,
+},
+
+usuarioActualEstado: {
+  backgroundColor: "#EAF8F0",
+},
+
+usuarioEstadoTexto: {
+  color: "#777777",
+  fontSize: 12,
+  fontWeight: "700",
+},
+
+usuarioActualTexto: {
+  color: "#2E9B59",
+},
+
+usuarioInactivoTexto: {
+  color: "#D9534F",
+},
+
 });

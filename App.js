@@ -18,6 +18,7 @@ import NuevoProductoScreen from "./src/screens/NuevoProductoScreen";
 import PerfilScreen from "./src/screens/PerfilScreen";
 import PerfilAdminScreen from "./src/screens/PerfilAdminScreen";
 import MapaSeguimientoScreen from "./src/screens/MapaSeguimientoScreen";
+import RegisterScreen from "./src/screens/RegisterScreen";
 
 import { AuthProvider } from "./src/context/AuthContext";
 import { CartProvider } from "./src/context/CartContext";
@@ -168,6 +169,10 @@ export default function App() {
                             <Stack.Screen
                               name="Login"
                               component={LoginScreen}
+                            />
+                            <Stack.Screen
+                              name="Register"
+                              component={RegisterScreen}
                             />
                             <Stack.Screen
                               name="MainTabs"

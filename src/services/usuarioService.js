@@ -1,176 +1,271 @@
-// Servicio CRUD para la entidad Usuario en Firestore
-// Colección: "Usuario"
-// Campos:
-//   - Usuariokey (string, ej: "US0003")
-//   - Nombre (string)
-//   - Telefono (string)
-//   - Correo (string)
-//   - Contraseña (string)
-//   - Rol (string: "Cliente" | "Repartidor" | "Admin")
-//   - Direccion (string)
+import api from "./api";
 
-import {
-  collection,
-  doc,
-  addDoc,
-  getDoc,
-  getDocs,
-  updateDoc,
-  deleteDoc,
-  query,
-  where,
-  onSnapshot,
-} from "firebase/firestore";
-import { db } from "./firebaseConfig.js";
+// =========================
+// Normalizar usuario
+// =========================
 
-const USUARIO_COLLECTION = "Usuario";
+export const formatearUsuario = (usuario) => {
+  if (!usuario) {
+    return null;
+  }
 
-/**
- * Obtener todos los usuarios
- */
+  return {
+    id:
+      usuario.id ||
+      usuario.uid ||
+      null,
+
+    uid:
+      usuario.uid ||
+      usuario.id ||
+      null,
+
+    Usuariokey:
+      usuario.Usuariokey ||
+      usuario.usuarioKey ||
+      "",
+
+    Nombre:
+      usuario.Nombre ||
+      usuario.nombre ||
+      "",
+
+    Correo:
+      usuario.Correo ||
+      usuario.correo ||
+      "",
+
+    Telefono:
+      usuario.Telefono ||
+      usuario.telefono ||
+      "",
+
+    Direccion:
+      usuario.Direccion ||
+      usuario.direccion ||
+      "",
+
+    Rol:
+      usuario.Rol ||
+      usuario.rol ||
+      "Cliente",
+
+    activo:
+      usuario.activo !== false,
+
+    fechaCreacion:
+      usuario.fechaCreacion ||
+      null,
+  };
+};
+
+// =========================
+// Obtener todos los usuarios
+// GET /api/usuarios
+// =========================
+
 export async function obtenerUsuarios() {
   try {
-    const querySnapshot = await getDocs(collection(db, USUARIO_COLLECTION));
-    const usuarios = [];
+    const respuesta = await api.get(
+      "/usuarios"
+    );
 
-    querySnapshot.forEach((docSnap) => {
-      const data = docSnap.data();
-      usuarios.push({
-        id: docSnap.id,
-        ...data,
-      });
-    });
+    const lista = Array.isArray(
+      respuesta.data
+    )
+      ? respuesta.data
+      : respuesta.data.usuarios || [];
 
-    return usuarios;
+    return lista.map(formatearUsuario);
   } catch (error) {
-    console.error("Error al obtener usuarios:", error);
+    console.log(
+      "Error obteniendo usuarios:",
+      {
+        mensaje:
+          error.response?.data?.mensaje ||
+          error.message,
+
+        estado:
+          error.response?.status,
+
+        datos:
+          error.response?.data,
+      }
+    );
+
     throw error;
   }
 }
 
-/**
- * Obtener usuario por ID
- */
+// =========================
+// Obtener usuario por ID
+// GET /api/usuarios/:id
+// =========================
+
 export async function obtenerUsuario(id) {
   try {
-    const docRef = doc(db, USUARIO_COLLECTION, id);
-    const docSnap = await getDoc(docRef);
-
-    if (docSnap.exists()) {
-      return {
-        id: docSnap.id,
-        ...docSnap.data(),
-      };
-    }
-    return null;
-  } catch (error) {
-    console.error("Error al obtener usuario:", error);
-    throw error;
-  }
-}
-
-/**
- * Autenticar usuario por correo y contraseña
- */
-export async function autenticarUsuario(correo, contrasena) {
-  try {
-    const q = query(
-      collection(db, USUARIO_COLLECTION),
-      where("Correo", "==", correo.trim())
+    const respuesta = await api.get(
+      `/usuarios/${id}`
     );
-    const querySnapshot = await getDocs(q);
 
-    if (querySnapshot.empty) {
-      return { exito: false, mensaje: "Usuario no encontrado" };
-    }
-
-    let usuarioEncontrado = null;
-    querySnapshot.forEach((docSnap) => {
-      const data = docSnap.data();
-      if (data.Contraseña === contrasena) {
-        const { Contraseña, ...datosSeguros } = data;
-        usuarioEncontrado = {
-          id: docSnap.id,
-          ...datosSeguros,
-        };
-      }
-    });
-
-    if (usuarioEncontrado) {
-      return { exito: true, usuario: usuarioEncontrado };
-    } else {
-      return { exito: false, mensaje: "Contraseña incorrecta" };
-    }
+    return formatearUsuario(
+      respuesta.data.usuario ||
+      respuesta.data
+    );
   } catch (error) {
-    console.error("Error en autenticación:", error);
+    if (error.response?.status === 404) {
+      return null;
+    }
+
+    console.log(
+      "Error obteniendo usuario:",
+      error.response?.data ||
+      error.message
+    );
+
     throw error;
   }
 }
 
-/**
- * Crear un nuevo usuario
- */
+// =========================
+// Crear usuario
+// POST /api/usuarios
+// =========================
+
 export async function crearUsuario(datos) {
   try {
-    const nuevoUsuario = {
-      Usuariokey: datos.Usuariokey || `US${Date.now().toString().slice(-4)}`,
-      Nombre: datos.Nombre || "",
-      Telefono: datos.Telefono || "",
-      Correo: datos.Correo || "",
-      Contraseña: datos.Contraseña || "123456",
-      Rol: datos.Rol || "Cliente",
-      Direccion: datos.Direccion || "",
+    const cuerpo = {
+      Usuariokey:
+        datos.Usuariokey || "",
+
+      Nombre:
+        datos.Nombre?.trim() || "",
+
+      Correo:
+        datos.Correo
+          ?.trim()
+          .toLowerCase() || "",
+
+      Telefono:
+        datos.Telefono?.trim() || "",
+
+      Direccion:
+        datos.Direccion?.trim() || "",
+
+      Rol:
+        datos.Rol || "Cliente",
+
+      Contraseña:
+        datos.Contraseña ||
+        datos.contrasena ||
+        "",
     };
 
-    const docRef = await addDoc(collection(db, USUARIO_COLLECTION), nuevoUsuario);
-    return { id: docRef.id, ...nuevoUsuario };
+    const respuesta = await api.post(
+      "/usuarios",
+      cuerpo
+    );
+
+    return formatearUsuario(
+      respuesta.data.usuario || {
+        id: respuesta.data.id,
+        ...cuerpo,
+      }
+    );
   } catch (error) {
-    console.error("Error al crear usuario:", error);
+    console.log(
+      "Error creando usuario:",
+      error.response?.data ||
+      error.message
+    );
+
     throw error;
   }
 }
 
-/**
- * Actualizar usuario por ID
- */
-export async function actualizarUsuario(id, datos) {
+// =========================
+// Actualizar usuario
+// PATCH /api/usuarios/:id
+// =========================
+
+export async function actualizarUsuario(
+  id,
+  datos
+) {
   try {
-    const docRef = doc(db, USUARIO_COLLECTION, id);
-    await updateDoc(docRef, datos);
-    return true;
+    /*
+     * No enviamos contraseña en las actualizaciones
+     * del perfil. Firebase Authentication administra
+     * la contraseña.
+     */
+    const cuerpo = {};
+
+    if (datos.Nombre !== undefined) {
+      cuerpo.Nombre = datos.Nombre.trim();
+    }
+
+    if (datos.Telefono !== undefined) {
+      cuerpo.Telefono =
+        datos.Telefono.trim();
+    }
+
+    if (datos.Direccion !== undefined) {
+      cuerpo.Direccion =
+        datos.Direccion.trim();
+    }
+
+    if (datos.Rol !== undefined) {
+      cuerpo.Rol = datos.Rol;
+    }
+
+    if (datos.activo !== undefined) {
+      cuerpo.activo = datos.activo;
+    }
+
+    if (datos.Usuariokey !== undefined) {
+      cuerpo.Usuariokey =
+        datos.Usuariokey;
+    }
+
+    const respuesta = await api.patch(
+      `/usuarios/${id}`,
+      cuerpo
+    );
+
+    return formatearUsuario(
+      respuesta.data.usuario ||
+      respuesta.data
+    );
   } catch (error) {
-    console.error("Error al actualizar usuario:", error);
+    console.log(
+      "Error actualizando usuario:",
+      error.response?.data ||
+      error.message
+    );
+
     throw error;
   }
 }
 
-/**
- * Eliminar usuario por ID
- */
+// =========================
+// Eliminar usuario
+// DELETE /api/usuarios/:id
+// =========================
+
 export async function eliminarUsuario(id) {
   try {
-    const docRef = doc(db, USUARIO_COLLECTION, id);
-    await deleteDoc(docRef);
-    return true;
+    const respuesta = await api.delete(
+      `/usuarios/${id}`
+    );
+
+    return respuesta.data;
   } catch (error) {
-    console.error("Error al eliminar usuario:", error);
+    console.log(
+      "Error eliminando usuario:",
+      error.response?.data ||
+      error.message
+    );
+
     throw error;
   }
-}
-
-/**
- * Escuchar cambios en tiempo real en la colección Usuario
- */
-export function escucharUsuarios(callback) {
-  const q = collection(db, USUARIO_COLLECTION);
-  return onSnapshot(q, (snapshot) => {
-    const usuarios = [];
-    snapshot.forEach((docSnap) => {
-      usuarios.push({
-        id: docSnap.id,
-        ...docSnap.data(),
-      });
-    });
-    callback(usuarios);
-  });
 }

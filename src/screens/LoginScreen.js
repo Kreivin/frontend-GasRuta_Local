@@ -1,5 +1,6 @@
 import React, {
   useContext,
+  useEffect,
   useState,
 } from "react";
 
@@ -25,34 +26,73 @@ import {
 
 import { auth } from "../services/firebaseConfig";
 import api from "../services/api";
-import { AuthContext } from "../context/AuthContext";
 
-export default function LoginScreen({ navigation }) {
+import {
+  AuthContext,
+} from "../context/AuthContext";
+
+export default function LoginScreen({
+  navigation,
+  route,
+}) {
   const authContext = useContext(AuthContext);
 
   const [correo, setCorreo] = useState("");
   const [contrasena, setContrasena] =
     useState("");
+
   const [
     mostrarContrasena,
     setMostrarContrasena,
   ] = useState(false);
 
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] =
+    useState(false);
+
+  // =========================
+  // Recibir correo del registro
+  // =========================
+
+  useEffect(() => {
+    const correoRegistrado =
+      route?.params?.correoRegistrado;
+
+    if (correoRegistrado) {
+      setCorreo(correoRegistrado);
+
+      /*
+       * Limpiamos el parámetro para evitar
+       * que vuelva a establecerse continuamente.
+       */
+      navigation.setParams({
+        correoRegistrado: undefined,
+      });
+    }
+  }, [
+    route?.params?.correoRegistrado,
+    navigation,
+  ]);
 
   // =========================
   // Validar correo
   // =========================
-  const correoValido = (valor) => {
-    const expresion = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-    return expresion.test(valor.trim());
+  const correoValido = (valor) => {
+    const expresion =
+      /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    return expresion.test(
+      valor.trim()
+    );
   };
 
   // =========================
   // Traducir errores Firebase
   // =========================
-  const obtenerMensajeFirebase = (error) => {
+
+  const obtenerMensajeFirebase = (
+    error
+  ) => {
     switch (error.code) {
       case "auth/invalid-email":
         return "El correo electrónico no es válido.";
@@ -87,12 +127,16 @@ export default function LoginScreen({ navigation }) {
   // =========================
   // Iniciar sesión
   // =========================
+
   const handleLogin = async () => {
     const correoLimpio = correo
       .trim()
       .toLowerCase();
 
-    if (!correoLimpio || !contrasena) {
+    if (
+      !correoLimpio ||
+      !contrasena
+    ) {
       Alert.alert(
         "Campos requeridos",
         "Ingresa tu correo y contraseña."
@@ -113,7 +157,7 @@ export default function LoginScreen({ navigation }) {
     try {
       setLoading(true);
 
-      // 1. Autenticar en Firebase Authentication
+      // 1. Autenticar con Firebase
       const credencial =
         await signInWithEmailAndPassword(
           auth,
@@ -121,26 +165,30 @@ export default function LoginScreen({ navigation }) {
           contrasena
         );
 
-      // 2. Obtener un token actualizado
+      // 2. Obtener token actualizado
       const token =
-        await credencial.user.getIdToken(true);
+        await credencial.user.getIdToken(
+          true
+        );
 
       console.log(
         "Firebase Authentication correcto:",
         credencial.user.uid
       );
 
-      // 3. Solicitar el perfil al backend
-      const respuestaPerfil = await api.get(
-        "/auth/perfil",
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      // 3. Consultar perfil en el backend
+      const respuestaPerfil =
+        await api.get(
+          "/auth/perfil",
+          {
+            headers: {
+              Authorization:
+                `Bearer ${token}`,
+            },
+          }
+        );
 
-      // 4. Extraer el perfil y el rol
+      // 4. Extraer perfil
       const perfil =
         respuestaPerfil.data.usuario;
 
@@ -150,57 +198,83 @@ export default function LoginScreen({ navigation }) {
         );
       }
 
-      console.log("Perfil recibido:", {
-        id: perfil.id,
-        uid: perfil.uid,
-        nombre: perfil.Nombre,
-        correo: perfil.Correo,
-        rol: perfil.Rol,
-      });
+      console.log(
+        "Perfil recibido:",
+        {
+          id: perfil.id,
+          uid: perfil.uid,
+          nombre: perfil.Nombre,
+          correo: perfil.Correo,
+          rol: perfil.Rol,
+        }
+      );
 
-      // 5. Guardar la sesión en AuthContext
-      if (authContext?.establecerSesion) {
+      // 5. Guardar sesión en AuthContext
+      if (
+        typeof authContext
+          ?.establecerSesion ===
+        "function"
+      ) {
         authContext.establecerSesion({
           usuario: perfil,
           token,
         });
       } else if (
-        authContext?.seleccionarUsuario
+        typeof authContext
+          ?.seleccionarUsuario ===
+        "function"
       ) {
         authContext.seleccionarUsuario(
           perfil,
           token
         );
       } else if (
-        authContext?.setCurrentUser
+        typeof authContext
+          ?.setCurrentUser ===
+        "function"
       ) {
-        authContext.setCurrentUser(perfil);
+        authContext.setCurrentUser(
+          perfil
+        );
       } else {
         console.warn(
           "AuthContext no tiene una función para guardar la sesión."
         );
       }
 
-      // 6. Por ahora todos entran a MainTabs.
-      // El rol sigue disponible para usarlo posteriormente.
-      navigation.replace("MainTabs", {
-        usuario: perfil,
-        rol: perfil.Rol,
-        token,
-      });
+      // 6. Todos entran por ahora a MainTabs
+      navigation.replace(
+        "MainTabs",
+        {
+          usuario: perfil,
+          rol: perfil.Rol,
+          token,
+        }
+      );
     } catch (error) {
-      console.log("Error de inicio de sesión:", {
-        codigo: error.code,
-        mensaje: error.message,
-        estado: error.response?.status,
-        datos: error.response?.data,
-      });
+      console.log(
+        "Error de inicio de sesión:",
+        {
+          codigo: error.code,
+          mensaje: error.message,
+          estado:
+            error.response?.status,
+          datos:
+            error.response?.data,
+        }
+      );
 
-      // Cerrar cualquier sesión incompleta
+      /*
+       * Si Firebase inició sesión pero el
+       * backend falló, cerramos la sesión
+       * incompleta.
+       */
       if (auth.currentUser) {
         try {
           await signOut(auth);
-        } catch (errorCerrarSesion) {
+        } catch (
+          errorCerrarSesion
+        ) {
           console.log(
             "No se pudo cerrar la sesión parcial:",
             errorCerrarSesion.message
@@ -209,7 +283,8 @@ export default function LoginScreen({ navigation }) {
       }
 
       const mensaje =
-        error.response?.data?.mensaje ||
+        error.response?.data
+          ?.mensaje ||
         obtenerMensajeFirebase(error);
 
       Alert.alert(
@@ -224,24 +299,9 @@ export default function LoginScreen({ navigation }) {
   // =========================
   // Abrir registro
   // =========================
+
   const abrirRegistro = () => {
-    /*
-     * Si todavía no tienes una pantalla registrada
-     * como "Register", mostramos un aviso para evitar
-     * un error de navegación.
-     */
-    const rutasRegistradas =
-      navigation.getState()?.routeNames || [];
-
-    if (rutasRegistradas.includes("Register")) {
-      navigation.navigate("Register");
-      return;
-    }
-
-    Alert.alert(
-      "Crear una cuenta",
-      "La pantalla de registro todavía no está configurada."
-    );
+    navigation.navigate("Register");
   };
 
   return (
@@ -258,19 +318,27 @@ export default function LoginScreen({ navigation }) {
           styles.scrollContenido
         }
         keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
+        showsVerticalScrollIndicator={
+          false
+        }
       >
         <View style={styles.phone}>
           <LinearGradient
-            colors={["#1F1B2E", "#4A2218"]}
+            colors={[
+              "#1F1B2E",
+              "#4A2218",
+            ]}
             style={styles.header}
           >
             <Text style={styles.logo}>
               🔥 GasRuta-Local
             </Text>
 
-            <Text style={styles.subtitle}>
-              Tu distribuidor de gas de confianza
+            <Text
+              style={styles.subtitle}
+            >
+              Tu distribuidor de gas de
+              confianza
             </Text>
           </LinearGradient>
 
@@ -279,11 +347,18 @@ export default function LoginScreen({ navigation }) {
               Iniciar sesión
             </Text>
 
-            <Text style={styles.description}>
-              Ingresa tus credenciales para continuar
+            <Text
+              style={
+                styles.description
+              }
+            >
+              Ingresa tus credenciales
+              para continuar
             </Text>
 
-            <Text style={styles.inputLabel}>
+            <Text
+              style={styles.inputLabel}
+            >
               Correo electrónico
             </Text>
 
@@ -300,27 +375,43 @@ export default function LoginScreen({ navigation }) {
               style={styles.input}
             />
 
-            <Text style={styles.inputLabel}>
+            <Text
+              style={styles.inputLabel}
+            >
               Contraseña
             </Text>
 
-            <View style={styles.passwordContainer}>
+            <View
+              style={
+                styles.passwordContainer
+              }
+            >
               <TextInput
                 placeholder="Ingresa tu contraseña"
                 placeholderTextColor="#999999"
                 value={contrasena}
-                onChangeText={setContrasena}
-                secureTextEntry={!mostrarContrasena}
+                onChangeText={
+                  setContrasena
+                }
+                secureTextEntry={
+                  !mostrarContrasena
+                }
                 autoCapitalize="none"
                 autoCorrect={false}
                 editable={!loading}
                 returnKeyType="done"
-                onSubmitEditing={handleLogin}
-                style={styles.passwordInput}
+                onSubmitEditing={
+                  handleLogin
+                }
+                style={
+                  styles.passwordInput
+                }
               />
 
               <TouchableOpacity
-                style={styles.showPasswordButton}
+                style={
+                  styles.showPasswordButton
+                }
                 onPress={() =>
                   setMostrarContrasena(
                     !mostrarContrasena
@@ -328,7 +419,11 @@ export default function LoginScreen({ navigation }) {
                 }
                 disabled={loading}
               >
-                <Text style={styles.showPasswordText}>
+                <Text
+                  style={
+                    styles.showPasswordText
+                  }
+                >
                   {mostrarContrasena
                     ? "Ocultar"
                     : "Ver"}
@@ -345,7 +440,9 @@ export default function LoginScreen({ navigation }) {
                 )
               }
             >
-              <Text style={styles.forgot}>
+              <Text
+                style={styles.forgot}
+              >
                 ¿Olvidaste tu contraseña?
               </Text>
             </TouchableOpacity>
@@ -365,14 +462,26 @@ export default function LoginScreen({ navigation }) {
                   color="#FFFFFF"
                 />
               ) : (
-                <Text style={styles.buttonText}>
+                <Text
+                  style={
+                    styles.buttonText
+                  }
+                >
                   Entrar
                 </Text>
               )}
             </TouchableOpacity>
 
-            <View style={styles.registerContainer}>
-              <Text style={styles.registerQuestion}>
+            <View
+              style={
+                styles.registerContainer
+              }
+            >
+              <Text
+                style={
+                  styles.registerQuestion
+                }
+              >
                 ¿No tienes una cuenta?
               </Text>
 
@@ -380,15 +489,24 @@ export default function LoginScreen({ navigation }) {
                 disabled={loading}
                 onPress={abrirRegistro}
               >
-                <Text style={styles.registerLink}>
+                <Text
+                  style={
+                    styles.registerLink
+                  }
+                >
                   Crear una cuenta
                 </Text>
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.securityText}>
-              Tu contraseña es administrada de forma
-              segura por Firebase Authentication.
+            <Text
+              style={
+                styles.securityText
+              }
+            >
+              Tu contraseña es administrada
+              de forma segura por Firebase
+              Authentication.
             </Text>
           </View>
         </View>
