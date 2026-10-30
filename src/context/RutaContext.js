@@ -1,135 +1,340 @@
-import React, { createContext, useState, useEffect, useCallback } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useEffect,
+  useState,
+} from "react";
 
-let rutaService = null;
-try {
-  rutaService = require("../services/rutaService");
-} catch (e) {
-  console.warn("rutaService no disponible (Firebase no configurado):", e.message);
-}
+import {
+  crearRuta,
+  obtenerTodasLasRutas,
+  actualizarRuta,
+  eliminarRuta,
+  iniciarRuta,
+  finalizarRuta,
+  actualizarUbicacionRuta,
+  escucharUbicacionRuta,
+  iniciarRastreoRepartidor,
+  abrirNavegacionGoogleMaps,
+  abrirEnGoogleMaps,
+  compartirUbicacionWhatsApp,
+} from "../services/rutaService";
 
-export const RutaContext = createContext();
+export const RutaContext =
+  createContext();
 
-export function RutaProvider({ children }) {
-  const [rutas, setRutas] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+export function RutaProvider({
+  children,
+}) {
+  const [rutas, setRutas] =
+    useState([]);
 
-  // Suscripción en tiempo real a la colección Ruta
-  useEffect(() => {
-    if (!rutaService?.escucharRutas) {
-      setLoading(false);
-      return;
-    }
+  const [loading, setLoading] =
+    useState(false);
 
-    try {
-      setLoading(true);
-      const unsubscribe = rutaService.escucharRutas((rutasActualizadas) => {
-        setRutas(rutasActualizadas);
+  const [error, setError] =
+    useState(null);
+
+  const obtenerMensaje = (err) => {
+    return (
+      err.response?.data?.mensaje ||
+      err.response?.data?.error ||
+      err.message ||
+      "Ocurrió un error con las rutas"
+    );
+  };
+
+  // =========================
+  // Cargar rutas
+  // =========================
+
+  const cargarRutas =
+    useCallback(async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const lista =
+          await obtenerTodasLasRutas();
+
+        setRutas(
+          Array.isArray(lista)
+            ? lista
+            : []
+        );
+
+        return lista;
+      } catch (err) {
+        const mensaje =
+          obtenerMensaje(err);
+
+        console.log(
+          "Error cargando rutas:",
+          {
+            mensaje,
+            estado:
+              err.response?.status,
+            datos:
+              err.response?.data,
+          }
+        );
+
+        setError(mensaje);
+        setRutas([]);
+
+        return [];
+      } finally {
         setLoading(false);
-      });
+      }
+    }, []);
 
-      return () => unsubscribe();
-    } catch (err) {
-      console.warn("No se pudo conectar a Firestore:", err.message);
-      setLoading(false);
-      setError("Firebase no está configurado. Configura firebaseConfig.js");
-    }
-  }, []);
+  // =========================
+  // Agregar ruta
+  // =========================
 
-  // Cargar rutas manualmente (útil para refresh)
-  const cargarRutas = useCallback(async () => {
-    if (!rutaService?.obtenerTodasLasRutas) {
-      setError("Firebase no está configurado.");
-      return;
-    }
-    try {
-      setLoading(true);
+  const agregarRuta =
+    useCallback(
+      async (rutaData) => {
+        try {
+          setError(null);
+
+          const nuevaRuta =
+            await crearRuta(rutaData);
+
+          setRutas(
+            (listaAnterior) => [
+              nuevaRuta,
+              ...listaAnterior,
+            ]
+          );
+
+          await cargarRutas();
+
+          return nuevaRuta;
+        } catch (err) {
+          const mensaje =
+            obtenerMensaje(err);
+
+          setError(mensaje);
+
+          throw err;
+        }
+      },
+      [cargarRutas]
+    );
+
+  // =========================
+  // Editar ruta
+  // =========================
+
+  const editarRuta =
+    useCallback(
+      async (
+        rutaId,
+        datosActualizados
+      ) => {
+        try {
+          setError(null);
+
+          const rutaActualizada =
+            await actualizarRuta(
+              rutaId,
+              datosActualizados
+            );
+
+          setRutas(
+            (listaAnterior) =>
+              listaAnterior.map(
+                (ruta) =>
+                  ruta.id === rutaId
+                    ? rutaActualizada
+                    : ruta
+              )
+          );
+
+          await cargarRutas();
+
+          return rutaActualizada;
+        } catch (err) {
+          setError(
+            obtenerMensaje(err)
+          );
+
+          throw err;
+        }
+      },
+      [cargarRutas]
+    );
+
+  // =========================
+  // Borrar ruta
+  // =========================
+
+  const borrarRuta =
+    useCallback(async (rutaId) => {
+      try {
+        setError(null);
+
+        await eliminarRuta(rutaId);
+
+        setRutas(
+          (listaAnterior) =>
+            listaAnterior.filter(
+              (ruta) =>
+                ruta.id !== rutaId
+            )
+        );
+
+        return true;
+      } catch (err) {
+        setError(
+          obtenerMensaje(err)
+        );
+
+        throw err;
+      }
+    }, []);
+
+  // =========================
+  // Iniciar una ruta
+  // =========================
+
+  const comenzarRuta =
+    useCallback(
+      async (rutaId) => {
+        try {
+          setError(null);
+
+          const actualizada =
+            await iniciarRuta(rutaId);
+
+          await cargarRutas();
+
+          return actualizada;
+        } catch (err) {
+          setError(
+            obtenerMensaje(err)
+          );
+
+          throw err;
+        }
+      },
+      [cargarRutas]
+    );
+
+  // =========================
+  // Finalizar una ruta
+  // =========================
+
+  const completarRuta =
+    useCallback(
+      async (rutaId) => {
+        try {
+          setError(null);
+
+          const actualizada =
+            await finalizarRuta(
+              rutaId
+            );
+
+          await cargarRutas();
+
+          return actualizada;
+        } catch (err) {
+          setError(
+            obtenerMensaje(err)
+          );
+
+          throw err;
+        }
+      },
+      [cargarRutas]
+    );
+
+  // =========================
+  // Actualizar GPS
+  // =========================
+
+  const actualizarUbicacion =
+    useCallback(
+      async (rutaId, coords) => {
+        try {
+          setError(null);
+
+          const rutaActualizada =
+            await actualizarUbicacionRuta(
+              rutaId,
+              coords
+            );
+
+          setRutas(
+            (listaAnterior) =>
+              listaAnterior.map(
+                (ruta) =>
+                  ruta.id === rutaId
+                    ? rutaActualizada
+                    : ruta
+              )
+          );
+
+          return rutaActualizada;
+        } catch (err) {
+          setError(
+            obtenerMensaje(err)
+          );
+
+          throw err;
+        }
+      },
+      []
+    );
+
+  // =========================
+  // Escuchar ubicación
+  // =========================
+
+  const escucharUbicacion =
+    useCallback(
+      (rutaId, callback) => {
+        return escucharUbicacionRuta(
+          rutaId,
+          callback
+        );
+      },
+      []
+    );
+
+  // =========================
+  // Iniciar rastreo
+  // =========================
+
+  const iniciarRastreo =
+    useCallback(
+      async (
+        rutaId,
+        onUpdate
+      ) => {
+        return iniciarRastreoRepartidor(
+          rutaId,
+          onUpdate
+        );
+      },
+      []
+    );
+
+  const refrescarRutas =
+    useCallback(async () => {
+      return cargarRutas();
+    }, [cargarRutas]);
+
+  const limpiarError =
+    useCallback(() => {
       setError(null);
-      const data = await rutaService.obtenerTodasLasRutas();
-      setRutas(data);
-    } catch (err) {
-      setError(err.message);
-      console.error("Error al cargar rutas:", err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    }, []);
 
-  // Crear nueva ruta
-  const agregarRuta = useCallback(async (rutaData) => {
-    if (!rutaService?.crearRuta) {
-      setError("Firebase no está configurado.");
-      throw new Error("Firebase no está configurado.");
-    }
-    try {
-      setError(null);
-      const id = await rutaService.crearRuta(rutaData);
-      return id;
-    } catch (err) {
-      setError(err.message);
-      throw err;
-    }
-  }, []);
-
-  // Actualizar ruta existente
-  const editarRuta = useCallback(async (rutaId, datosActualizados) => {
-    if (!rutaService?.actualizarRuta) {
-      setError("Firebase no está configurado.");
-      throw new Error("Firebase no está configurado.");
-    }
-    try {
-      setError(null);
-      await rutaService.actualizarRuta(rutaId, datosActualizados);
-    } catch (err) {
-      setError(err.message);
-      throw err;
-    }
-  }, []);
-
-  // Eliminar ruta
-  const borrarRuta = useCallback(async (rutaId) => {
-    if (!rutaService?.eliminarRuta) {
-      setError("Firebase no está configurado.");
-      throw new Error("Firebase no está configurado.");
-    }
-    try {
-      setError(null);
-      await rutaService.eliminarRuta(rutaId);
-    } catch (err) {
-      setError(err.message);
-      throw err;
-    }
-  }, []);
-
-  // Actualizar ubicación en tiempo real
-  const actualizarUbicacion = useCallback(async (rutaId, coords) => {
-    if (!rutaService?.actualizarUbicacionRuta) {
-      setError("Firebase no está configurado.");
-      throw new Error("Firebase no está configurado.");
-    }
-    try {
-      await rutaService.actualizarUbicacionRuta(rutaId, coords);
-    } catch (err) {
-      setError(err.message);
-      throw err;
-    }
-  }, []);
-
-  // Escuchar ubicación de una ruta en tiempo real
-  const escucharUbicacion = useCallback((rutaId, callback) => {
-    if (!rutaService?.escucharUbicacionRuta) {
-      return () => {};
-    }
-    return rutaService.escucharUbicacionRuta(rutaId, callback);
-  }, []);
-
-  // Iniciar rastreo con expo-location para el repartidor
-  const iniciarRastreo = useCallback(async (rutaId, onUpdate) => {
-    if (!rutaService?.iniciarRastreoRepartidor) {
-      throw new Error("Servicio de rastreo no disponible.");
-    }
-    return await rutaService.iniciarRastreoRepartidor(rutaId, onUpdate);
-  }, []);
+  useEffect(() => {
+    cargarRutas();
+  }, [cargarRutas]);
 
   return (
     <RutaContext.Provider
@@ -137,16 +342,25 @@ export function RutaProvider({ children }) {
         rutas,
         loading,
         error,
+
         cargarRutas,
+        refrescarRutas,
         agregarRuta,
         editarRuta,
         borrarRuta,
+
+        comenzarRuta,
+        completarRuta,
+
         actualizarUbicacion,
         escucharUbicacion,
         iniciarRastreo,
-        abrirNavegacionGoogleMaps: rutaService?.abrirNavegacionGoogleMaps,
-        abrirEnGoogleMaps: rutaService?.abrirEnGoogleMaps,
-        compartirUbicacionWhatsApp: rutaService?.compartirUbicacionWhatsApp,
+
+        abrirNavegacionGoogleMaps,
+        abrirEnGoogleMaps,
+        compartirUbicacionWhatsApp,
+
+        limpiarError,
       }}
     >
       {children}

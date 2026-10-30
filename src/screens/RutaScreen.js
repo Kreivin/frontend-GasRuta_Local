@@ -50,49 +50,161 @@ export default function RutaScreen({ navigation }) {
   };
 
   const handleOpenEdit = (ruta) => {
-    setEditMode(true);
-    setSelectedRuta(ruta);
-    setPedidoId(ruta.pedidoId || "");
-    setDistanciaEstimada(ruta.distancia_estimada || "");
-    setRutaAsignada(ruta.ruta_asignada || "");
-    setTiempoEstimado(ruta.tiempo_estimado ? String(ruta.tiempo_estimado) : "");
-    setModalVisible(true);
-  };
+  setEditMode(true);
+  setSelectedRuta(ruta);
+
+  setPedidoId(
+    ruta.pedidoId || ""
+  );
+
+  setDistanciaEstimada(
+    ruta.distancia_estimada !==
+      null &&
+    ruta.distancia_estimada !==
+      undefined
+      ? String(
+          ruta.distancia_estimada
+        )
+      : ""
+  );
+
+  setRutaAsignada(
+    ruta.ruta_asignada || ""
+  );
+
+  setTiempoEstimado(
+    ruta.tiempo_estimado !==
+      null &&
+    ruta.tiempo_estimado !==
+      undefined
+      ? String(
+          ruta.tiempo_estimado
+        )
+      : ""
+  );
+
+  setModalVisible(true);
+};
 
   const handleSave = async () => {
-    if (!pedidoId.trim()) {
-      Alert.alert("Error", "El ID del pedido es obligatorio.");
-      return;
-    }
-    if (!rutaAsignada.trim()) {
-      Alert.alert("Error", "La ruta asignada es obligatoria.");
-      return;
-    }
+  if (!pedidoId.trim()) {
+    Alert.alert(
+      "Pedido requerido",
+      "El ID del pedido es obligatorio."
+    );
+    return;
+  }
 
-    try {
-      const rutaData = {
-        pedidoId: pedidoId.trim(),
-        distancia_estimada: distanciaEstimada.trim(),
-        ruta_asignada: rutaAsignada.trim(),
-        tiempo_estimado: Number(tiempoEstimado) || 0,
-        fecha_inicio: new Date(),
-        fecha_final: null,
-      };
+  if (!rutaAsignada.trim()) {
+    Alert.alert(
+      "Ruta requerida",
+      "La descripción de la ruta es obligatoria."
+    );
+    return;
+  }
 
-      if (editMode && selectedRuta) {
-        await editarRuta(selectedRuta.id, rutaData);
-        Alert.alert("✅ Ruta actualizada", "La ruta se actualizó correctamente.");
-      } else {
-        await agregarRuta(rutaData);
-        Alert.alert("✅ Ruta creada", "La nueva ruta se creó correctamente.");
-      }
+  const distancia = Number(
+    distanciaEstimada
+  );
 
-      setModalVisible(false);
-      resetForm();
-    } catch (err) {
-      Alert.alert("Error", "No se pudo guardar la ruta. Intenta de nuevo.");
-    }
+  const tiempo = Number(
+    tiempoEstimado
+  );
+
+  if (
+    Number.isNaN(distancia) ||
+    distancia <= 0
+  ) {
+    Alert.alert(
+      "Distancia no válida",
+      "La distancia debe ser un número mayor que cero. Por ejemplo: 20"
+    );
+    return;
+  }
+
+  if (
+    !Number.isInteger(tiempo) ||
+    tiempo <= 0
+  ) {
+    Alert.alert(
+      "Tiempo no válido",
+      "El tiempo debe ser un número entero mayor que cero."
+    );
+    return;
+  }
+
+  const rutaData = {
+    pedidoId:
+      pedidoId.trim(),
+
+    distancia_estimada:
+      distancia,
+
+    ruta_asignada:
+      rutaAsignada.trim(),
+
+    tiempo_estimado:
+      tiempo,
   };
+
+  console.log(
+    "Datos enviados para ruta:",
+    rutaData
+  );
+
+  try {
+    if (
+      editMode &&
+      selectedRuta
+    ) {
+      await editarRuta(
+        selectedRuta.id,
+        rutaData
+      );
+
+      Alert.alert(
+        "Ruta actualizada",
+        "La ruta se actualizó correctamente."
+      );
+    } else {
+      await agregarRuta(
+        rutaData
+      );
+
+      Alert.alert(
+        "Ruta creada",
+        "La ruta se creó correctamente."
+      );
+    }
+
+    await cargarRutas();
+
+    setModalVisible(false);
+    resetForm();
+  } catch (err) {
+    const mensaje =
+      err.response?.data?.mensaje ||
+      err.response?.data?.error ||
+      err.message ||
+      "No se pudo guardar la ruta.";
+
+    console.log(
+      "Error guardando ruta:",
+      {
+        mensaje,
+        estado:
+          err.response?.status,
+        datos:
+          err.response?.data,
+      }
+    );
+
+    Alert.alert(
+      "No se pudo guardar",
+      mensaje
+    );
+  }
+};
 
   const handleDelete = (ruta) => {
     Alert.alert(
@@ -122,16 +234,33 @@ export default function RutaScreen({ navigation }) {
     setRefreshing(false);
   };
 
-  const formatDate = (date) => {
-    if (!date) return "—";
-    return date.toLocaleDateString("es-NI", {
+ const formatDate = (date) => {
+  if (!date) {
+    return "—";
+  }
+
+  const fecha =
+    date instanceof Date
+      ? date
+      : new Date(date);
+
+  if (
+    Number.isNaN(fecha.getTime())
+  ) {
+    return "Fecha no válida";
+  }
+
+  return fecha.toLocaleString(
+    "es-NI",
+    {
       day: "2-digit",
       month: "short",
       year: "numeric",
       hour: "2-digit",
       minute: "2-digit",
-    });
-  };
+    }
+  );
+};
 
   if (loading && rutas.length === 0) {
     return (
@@ -216,7 +345,9 @@ export default function RutaScreen({ navigation }) {
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>📏 Distancia</Text>
                     <Text style={styles.detailValue}>
-                      {ruta.distancia_estimada || "—"}
+                      {ruta.distancia_estimada
+                        ? `${ruta.distancia_estimada} km`
+                        : "—"}
                     </Text>
                   </View>
 
@@ -315,12 +446,18 @@ export default function RutaScreen({ navigation }) {
                 placeholderTextColor="#AAA"
               />
 
-              <Text style={styles.inputLabel}>DISTANCIA ESTIMADA</Text>
+              <Text style={styles.inputLabel}>
+                DISTANCIA ESTIMADA (KM)
+              </Text>
+
               <TextInput
                 style={styles.input}
-                placeholder="Ej: 20km de distancia"
+                placeholder="Ej: 20"
                 value={distanciaEstimada}
-                onChangeText={setDistanciaEstimada}
+                onChangeText={
+                  setDistanciaEstimada
+                }
+                keyboardType="decimal-pad"
                 placeholderTextColor="#AAA"
               />
 

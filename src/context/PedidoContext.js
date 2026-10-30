@@ -5,25 +5,23 @@ import React, {
   useState,
 } from "react";
 
-import {
-  crearPedido,
-  obtenerPedidos,
-  obtenerPedido,
-  obtenerPedidosUsuario,
-  actualizarPedido,
-  actualizarEstadoPedido,
-  eliminarPedido,
-} from "../services/pedidoService";
+import api from "../services/api";
 
 export const PedidoContext = createContext();
 
 export function PedidoProvider({ children }) {
   const [pedidos, setPedidos] = useState([]);
-  const [pedidoSeleccionado, setPedidoSeleccionado] =
-    useState(null);
-
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  const obtenerMensajeError = (err) => {
+    return (
+      err.response?.data?.mensaje ||
+      err.response?.data?.error ||
+      err.message ||
+      "Ocurrió un error con los pedidos"
+    );
+  };
 
   // =========================
   // Cargar todos los pedidos
@@ -33,365 +31,180 @@ export function PedidoProvider({ children }) {
       setLoading(true);
       setError(null);
 
-      const lista = await obtenerPedidos();
+      const respuesta = await api.get("/pedidos");
 
-      setPedidos(
-        Array.isArray(lista) ? lista : []
-      );
+      const lista = Array.isArray(respuesta.data)
+        ? respuesta.data
+        : respuesta.data.pedidos || [];
+
+      setPedidos(lista);
 
       return lista;
     } catch (err) {
-      console.error(
-        "Error al cargar pedidos:",
-        err.message
-      );
+      const mensaje = obtenerMensajeError(err);
 
-      setError(
-        err.message ||
-          "No se pudieron cargar los pedidos."
-      );
+      console.log("Error cargando pedidos:", {
+        mensaje,
+        estado: err.response?.status,
+        datos: err.response?.data,
+      });
 
+      setError(mensaje);
       setPedidos([]);
 
-      throw err;
+      return [];
     } finally {
       setLoading(false);
     }
   }, []);
 
   // =========================
-  // Cargar pedido por ID
-  // =========================
-  const cargarPedidoPorId = useCallback(
-    async (id) => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        if (!id) {
-          throw new Error(
-            "El ID del pedido es obligatorio."
-          );
-        }
-
-        const pedido = await obtenerPedido(id);
-
-        setPedidoSeleccionado(pedido);
-
-        return pedido;
-      } catch (err) {
-        console.error(
-          "Error al obtener pedido:",
-          err.message
-        );
-
-        setError(
-          err.message ||
-            "No se pudo obtener el pedido."
-        );
-
-        setPedidoSeleccionado(null);
-
-        throw err;
-      } finally {
-        setLoading(false);
-      }
-    },
-    []
-  );
-
-  // =========================
-  // Cargar pedidos de usuario
-  // =========================
-  const cargarPedidosUsuario = useCallback(
-    async (usuarioId) => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        if (!usuarioId) {
-          throw new Error(
-            "El ID del usuario es obligatorio."
-          );
-        }
-
-        const lista =
-          await obtenerPedidosUsuario(usuarioId);
-
-        setPedidos(
-          Array.isArray(lista) ? lista : []
-        );
-
-        return lista;
-      } catch (err) {
-        console.error(
-          "Error al cargar pedidos del usuario:",
-          err.message
-        );
-
-        setError(
-          err.message ||
-            "No se pudieron cargar los pedidos del usuario."
-        );
-
-        setPedidos([]);
-
-        throw err;
-      } finally {
-        setLoading(false);
-      }
-    },
-    []
-  );
-
-  // =========================
   // Crear pedido
   // =========================
-  const crearNuevoPedido = useCallback(
-    async (datosPedido) => {
+  const crearPedido = useCallback(
+    async (datos) => {
       try {
-        setLoading(true);
         setError(null);
 
-        const resultado =
-          await crearPedido(datosPedido);
+        console.log(
+          "PedidoContext enviando al backend:",
+          datos
+        );
 
-        // Volver a consultar para mantener la lista actualizada
-        await cargarPedidos();
+        const respuesta = await api.post(
+          "/pedidos",
+          datos
+        );
 
-        return resultado;
+        console.log(
+          "PedidoContext respuesta:",
+          respuesta.data
+        );
+
+        const pedidoCreado = {
+          id: respuesta.data.id,
+          ...(respuesta.data.pedido || {}),
+        };
+
+        setPedidos((listaAnterior) => [
+          pedidoCreado,
+          ...listaAnterior,
+        ]);
+
+        return {
+          ...respuesta.data,
+          pedido: pedidoCreado,
+        };
       } catch (err) {
-        console.error(
-          "Error al crear pedido:",
-          err.message
-        );
+        const mensaje = obtenerMensajeError(err);
 
-        setError(
-          err.message ||
-            "No se pudo crear el pedido."
-        );
+        console.log("Error creando pedido:", {
+          mensaje,
+          estado: err.response?.status,
+          datos: err.response?.data,
+          ruta: err.config?.url,
+        });
+
+        setError(mensaje);
 
         throw err;
-      } finally {
-        setLoading(false);
+      }
+    },
+    []
+  );
+
+  // =========================
+  // Actualizar pedido
+  // =========================
+  const actualizarPedido = useCallback(
+    async (id, datos) => {
+      try {
+        setError(null);
+
+        const respuesta = await api.patch(
+          `/pedidos/${id}`,
+          datos
+        );
+
+        await cargarPedidos();
+
+        return respuesta.data;
+      } catch (err) {
+        setError(obtenerMensajeError(err));
+        throw err;
       }
     },
     [cargarPedidos]
   );
 
   // =========================
-  // Editar pedido
+  // Actualizar estado
   // =========================
-  const editarPedido = useCallback(
-    async (id, datosActualizados) => {
+  const actualizarEstadoPedido = useCallback(
+    async (id, estado) => {
       try {
-        setLoading(true);
         setError(null);
 
-        if (!id) {
-          throw new Error(
-            "El ID del pedido es obligatorio."
-          );
-        }
-
-        const resultado = await actualizarPedido(
-          id,
-          datosActualizados
+        const respuesta = await api.patch(
+          `/pedidos/${id}/estado`,
+          {
+            estado,
+          }
         );
 
         await cargarPedidos();
 
-        if (pedidoSeleccionado?.id === id) {
-          const pedidoActualizado =
-            resultado?.pedido || resultado;
-
-          setPedidoSeleccionado(
-            pedidoActualizado
-          );
-        }
-
-        return resultado;
+        return respuesta.data;
       } catch (err) {
-        console.error(
-          "Error al actualizar pedido:",
-          err.message
-        );
-
-        setError(
-          err.message ||
-            "No se pudo actualizar el pedido."
-        );
-
+        setError(obtenerMensajeError(err));
         throw err;
-      } finally {
-        setLoading(false);
       }
     },
-    [cargarPedidos, pedidoSeleccionado]
-  );
-
-  // =========================
-  // Cambiar estado
-  // =========================
-  const cambiarEstado = useCallback(
-    async (id, nuevoEstado) => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        if (!id) {
-          throw new Error(
-            "El ID del pedido es obligatorio."
-          );
-        }
-
-        if (!nuevoEstado) {
-          throw new Error(
-            "El nuevo estado es obligatorio."
-          );
-        }
-
-        const resultado =
-          await actualizarEstadoPedido(
-            id,
-            nuevoEstado
-          );
-
-        // Actualización local inmediata
-        setPedidos((pedidosActuales) =>
-          pedidosActuales.map((pedido) =>
-            pedido.id === id
-              ? {
-                  ...pedido,
-                  estado: nuevoEstado,
-                }
-              : pedido
-          )
-        );
-
-        if (pedidoSeleccionado?.id === id) {
-          setPedidoSeleccionado(
-            (pedidoActual) => ({
-              ...pedidoActual,
-              estado: nuevoEstado,
-            })
-          );
-        }
-
-        return resultado;
-      } catch (err) {
-        console.error(
-          "Error al cambiar estado:",
-          err.message
-        );
-
-        setError(
-          err.message ||
-            "No se pudo cambiar el estado."
-        );
-
-        throw err;
-      } finally {
-        setLoading(false);
-      }
-    },
-    [pedidoSeleccionado]
+    [cargarPedidos]
   );
 
   // =========================
   // Eliminar pedido
   // =========================
-  const borrarPedido = useCallback(
+  const eliminarPedido = useCallback(
     async (id) => {
       try {
-        setLoading(true);
         setError(null);
 
-        if (!id) {
-          throw new Error(
-            "El ID del pedido es obligatorio."
-          );
-        }
+        const respuesta = await api.delete(
+          `/pedidos/${id}`
+        );
 
-        const resultado =
-          await eliminarPedido(id);
-
-        // Retirar inmediatamente de la lista local
-        setPedidos((pedidosActuales) =>
-          pedidosActuales.filter(
+        setPedidos((listaAnterior) =>
+          listaAnterior.filter(
             (pedido) => pedido.id !== id
           )
         );
 
-        if (pedidoSeleccionado?.id === id) {
-          setPedidoSeleccionado(null);
-        }
-
-        return resultado;
+        return respuesta.data;
       } catch (err) {
-        console.error(
-          "Error al eliminar pedido:",
-          err.message
-        );
-
-        setError(
-          err.message ||
-            "No se pudo eliminar el pedido."
-        );
-
+        setError(obtenerMensajeError(err));
         throw err;
-      } finally {
-        setLoading(false);
       }
     },
-    [pedidoSeleccionado]
+    []
   );
 
-  // =========================
-  // Limpiar errores
-  // =========================
-  const limpiarError = useCallback(() => {
-    setError(null);
-  }, []);
-
-  // =========================
-  // Limpiar pedido seleccionado
-  // =========================
-  const limpiarPedidoSeleccionado =
-    useCallback(() => {
-      setPedidoSeleccionado(null);
-    }, []);
-
-  // Cargar pedidos cuando se monta el Provider
   useEffect(() => {
-    cargarPedidos().catch(() => {
-      // El mensaje ya queda guardado en error.
-    });
+    cargarPedidos();
   }, [cargarPedidos]);
 
   return (
     <PedidoContext.Provider
       value={{
-        // Estados
         pedidos,
-        pedidoSeleccionado,
         loading,
         error,
-
-        // Consultas
         cargarPedidos,
-        cargarPedidoPorId,
-        cargarPedidosUsuario,
-
-        // CRUD
-        crearNuevoPedido,
-        editarPedido,
-        cambiarEstado,
-        borrarPedido,
-
-        // Utilidades
-        limpiarError,
-        limpiarPedidoSeleccionado,
+        crearPedido,
+        actualizarPedido,
+        actualizarEstadoPedido,
+        eliminarPedido,
       }}
     >
       {children}

@@ -152,13 +152,13 @@ export default function App() {
     <View style={styles.webContainer}>
       <View style={styles.phoneContainer}>
         <AuthProvider>
-          <ProductProvider>
             <PedidoProvider>
               <RutaProvider>
                 <ResenaProvider>
                   <IncidenciaProvider>
                     <HistorialProvider>
                       <CartProvider>
+                        <ProductProvider>
                         <NavigationContainer>
                           <Stack.Navigator
                             screenOptions={{
@@ -199,13 +199,14 @@ export default function App() {
                             />
                           </Stack.Navigator>
                         </NavigationContainer>
+                        </ProductProvider>
                       </CartProvider>
                     </HistorialProvider>
                   </IncidenciaProvider>
                 </ResenaProvider>
               </RutaProvider>
             </PedidoProvider>
-          </ProductProvider>
+          
         </AuthProvider>
       </View>
     </View>

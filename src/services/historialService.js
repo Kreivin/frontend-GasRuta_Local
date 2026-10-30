@@ -1,99 +1,171 @@
-// Servicio para la entidad Historial en Firestore
-// Colección: "Historial"
-// Campos:
-//   - id_usuario (referencia a documento en colección Usuario)
-//   - id_pedido (referencia a documento en colección Pedido)
-//   - accion (string: ej: "pedido_creado", "pedido_entregado", "ruta_iniciada")
-//   - estado (string: "pendiente", "entregado", etc.)
-//   - descripcio / descripcion (string)
-//   - fecha_entrega (timestamp | null)
-//   - fechaActualizacion (timestamp)
+import api from "./api";
 
-import {
-  collection,
-  doc,
-  addDoc,
-  getDocs,
-  query,
-  where,
-  orderBy,
-  onSnapshot,
-  Timestamp,
-} from "firebase/firestore";
-import { db } from "./firebaseConfig.js";
+// =========================
+// Formatear fecha
+// =========================
+const formatearFecha = (fecha) => {
+  if (!fecha) {
+    return "En proceso";
+  }
 
-const HISTORIAL_COLLECTION = "Historial";
+  // Timestamp serializado desde Firebase Admin
+  if (
+    typeof fecha === "object" &&
+    fecha._seconds !== undefined
+  ) {
+    const fechaConvertida = new Date(
+      fecha._seconds * 1000
+    );
 
-export function formatearHistorialDoc(docSnap) {
-  const data = docSnap.data();
-  const desc = data.descripcio || data.descripcion || "";
+    return fechaConvertida.toLocaleString(
+      "es-NI"
+    );
+  }
+
+  const fechaConvertida = new Date(fecha);
+
+  if (Number.isNaN(fechaConvertida.getTime())) {
+    return "Fecha no disponible";
+  }
+
+  return fechaConvertida.toLocaleString(
+    "es-NI"
+  );
+};
+
+// =========================
+// Formatear registro
+// =========================
+export function formatearHistorial(item) {
+  const descripcion =
+    item.descripcion ||
+    item.descripcio ||
+    "";
+
   return {
-    id: docSnap.id,
-    ...data,
-    descripcion: desc,
-    descripcio: desc,
-    usuarioId: data.id_usuario?.id || (typeof data.id_usuario === "string" ? data.id_usuario : null),
-    pedidoId: data.id_pedido?.id || (typeof data.id_pedido === "string" ? data.id_pedido : null),
-    fechaEntregaFormateada: data.fecha_entrega?.toDate
-      ? data.fecha_entrega.toDate().toLocaleString()
-      : (data.fecha_entrega || "En proceso"),
+    id: item.id,
+
+    usuarioId:
+      item.usuarioId ||
+      item.id_usuario ||
+      null,
+
+    pedidoId:
+      item.pedidoId ||
+      item.id_pedido ||
+      null,
+
+    accion:
+      item.accion ||
+      "evento_general",
+
+    estado:
+      item.estado ||
+      "registrado",
+
+    descripcion,
+    descripcio: descripcion,
+
+    fecha_entrega:
+      item.fecha_entrega ||
+      item.fechaEntrega ||
+      null,
+
+    fechaActualizacion:
+      item.fechaActualizacion ||
+      null,
+
+    fechaEntregaFormateada:
+      formatearFecha(
+        item.fecha_entrega ||
+        item.fechaEntrega
+      ),
+
+    fechaActualizacionFormateada:
+      formatearFecha(
+        item.fechaActualizacion
+      ),
   };
 }
 
-/**
- * Crear un nuevo registro en el historial
- */
+// =========================
+// Crear historial
+// POST /api/historial
+// =========================
 export async function crearHistorial(datos) {
   try {
-    const usuarioRef = datos.usuarioId ? doc(db, "Usuario", datos.usuarioId) : null;
-    const pedidoRef = datos.pedidoId ? doc(db, "Pedido", datos.pedidoId) : null;
+    const respuesta = await api.post(
+      "/historial",
+      {
+        usuarioId:
+          datos.usuarioId || null,
 
-    const nuevoRegistro = {
-      id_usuario: usuarioRef,
-      id_pedido: pedidoRef,
-      accion: datos.accion || "evento_general",
-      estado: datos.estado || "registrado",
-      descripcio: datos.descripcion || datos.descripcio || "",
-      descripcion: datos.descripcion || datos.descripcio || "",
-      fecha_entrega: datos.fecha_entrega ? Timestamp.fromDate(new Date(datos.fecha_entrega)) : null,
-      fechaActualizacion: Timestamp.now(),
-    };
+        pedidoId:
+          datos.pedidoId || null,
 
-    const docRef = await addDoc(collection(db, HISTORIAL_COLLECTION), nuevoRegistro);
-    return { id: docRef.id, ...nuevoRegistro };
+        accion:
+          datos.accion ||
+          "evento_general",
+
+        estado:
+          datos.estado ||
+          "registrado",
+
+        descripcion:
+          datos.descripcion ||
+          datos.descripcio ||
+          "",
+
+        fechaEntrega:
+          datos.fechaEntrega ||
+          datos.fecha_entrega ||
+          null,
+      }
+    );
+
+    const registro =
+      respuesta.data.historial ||
+      respuesta.data.registro ||
+      respuesta.data;
+
+    return formatearHistorial(registro);
   } catch (error) {
-    console.error("Error al registrar historial:", error);
+    console.error(
+      "Error al registrar historial:",
+      error.response?.data ||
+        error.message
+    );
+
     throw error;
   }
 }
 
-/**
- * Obtener todos los registros del historial
- */
+// =========================
+// Obtener historiales
+// GET /api/historial
+// =========================
 export async function obtenerHistoriales() {
   try {
-    const querySnapshot = await getDocs(collection(db, HISTORIAL_COLLECTION));
-    const items = [];
-    querySnapshot.forEach((docSnap) => {
-      items.push(formatearHistorialDoc(docSnap));
-    });
-    return items;
+    const respuesta = await api.get(
+      "/historial"
+    );
+
+    const lista = Array.isArray(
+      respuesta.data
+    )
+      ? respuesta.data
+      : respuesta.data.historiales ||
+        respuesta.data.datos ||
+        [];
+
+    return lista.map(formatearHistorial);
   } catch (error) {
-    console.error("Error al obtener historial:", error);
+    console.error(
+      "Error al obtener historial:",
+      error.response?.data ||
+        error.message
+    );
+
     throw error;
   }
-}
-
-/**
- * Escuchar historial en tiempo real
- */
-export function escucharHistorial(callback) {
-  const q = collection(db, HISTORIAL_COLLECTION);
-  return onSnapshot(q, (snapshot) => {
-    const items = [];
-    snapshot.forEach((docSnap) => {
-      items.push(formatearHistorialDoc(docSnap));
-    });
-    callback(items);
-  });
 }
