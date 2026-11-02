@@ -1,126 +1,286 @@
-import React, { createContext, useState, useEffect, useCallback } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useEffect,
+  useState,
+} from "react";
 
-let resenaService = null;
-try {
-  resenaService = require("../services/resenaService");
-} catch (e) {
-  console.warn("resenaService no disponible (Firebase no configurado):", e.message);
-}
+import {
+  crearResena,
+  obtenerTodasLasResenas,
+  obtenerResenasPorPedido,
+  actualizarResena,
+  eliminarResena,
+} from "../services/resenaService";
 
-const SAMPLE_RESENAS = [
-  {
-    id: "sample_resena_1",
-    clienteId: "MFSECY3Z1K6X3JePUdO5",
-    pedidoId: "NTiOxIHiRc8ZXWxcmVfR",
-    calificacion: 5,
-    comentario: "que buen servicio realizan las entregas rapido y en buen estado",
-    fechaResena: new Date("2026-09-30T11:56:45-06:00"),
-    repartidorId: "SPk4vMRTErAtvsg23WHa",
-  },
-];
+export const ResenaContext =
+  createContext();
 
-export const ResenaContext = createContext();
+export function ResenaProvider({
+  children,
+}) {
+  const [resenas, setResenas] =
+    useState([]);
 
-export function ResenaProvider({ children }) {
-  const [resenas, setResenas] = useState(SAMPLE_RESENAS);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [loading, setLoading] =
+    useState(false);
 
-  // Suscripción en tiempo real a la colección Resena si Firebase está activo
-  useEffect(() => {
-    if (!resenaService?.escucharResenas) {
-      setLoading(false);
-      return;
-    }
+  const [error, setError] =
+    useState(null);
 
-    try {
-      setLoading(true);
-      const unsubscribe = resenaService.escucharResenas((resenasActualizadas) => {
-        if (resenasActualizadas && resenasActualizadas.length > 0) {
-          setResenas(resenasActualizadas);
-        }
-        setLoading(false);
-      });
+  // =========================
+  // Obtener mensaje
+  // =========================
 
-      return () => unsubscribe();
-    } catch (err) {
-      console.warn("No se pudo conectar a Firestore (Resena):", err.message);
-      setLoading(false);
-    }
-  }, []);
-
-  // Cargar reseñas manualmente
-  const cargarResenas = useCallback(async () => {
-    if (!resenaService?.obtenerTodasLasResenas) {
-      return;
-    }
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await resenaService.obtenerTodasLasResenas();
-      if (data && data.length > 0) {
-        setResenas(data);
-      }
-    } catch (err) {
-      console.warn("Error al cargar reseñas desde Firestore:", err.message);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  // Crear nueva reseña (con fallback local)
-  const agregarResena = useCallback(async (resenaData) => {
-    const localId = "resena_" + Date.now();
-    const nuevaLocal = {
-      id: localId,
-      clienteId: resenaData.clienteId,
-      pedidoId: resenaData.pedidoId,
-      calificacion: resenaData.calificacion || 5,
-      comentario: resenaData.comentario || "",
-      fechaResena: new Date(),
-      repartidorId: resenaData.repartidorId,
-    };
-
-    if (resenaService?.crearResena) {
-      try {
-        const id = await resenaService.crearResena(resenaData);
-        nuevaLocal.id = id;
-      } catch (err) {
-        console.warn("No se pudo guardar en Firestore, guardando localmente:", err.message);
-      }
-    }
-
-    setResenas((prev) => [nuevaLocal, ...prev]);
-    return nuevaLocal.id;
-  }, []);
-
-  // Actualizar reseña
-  const editarResena = useCallback(async (resenaId, datosActualizados) => {
-    if (resenaService?.actualizarResena) {
-      try {
-        await resenaService.actualizarResena(resenaId, datosActualizados);
-      } catch (err) {
-        console.warn("Error actualizando en Firestore:", err.message);
-      }
-    }
-
-    setResenas((prev) =>
-      prev.map((item) => (item.id === resenaId ? { ...item, ...datosActualizados } : item))
+  const obtenerMensajeError = (
+    err
+  ) => {
+    return (
+      err.response?.data?.mensaje ||
+      err.response?.data?.error ||
+      err.message ||
+      "Ocurrió un error con las reseñas."
     );
-  }, []);
+  };
 
-  // Eliminar reseña
-  const borrarResena = useCallback(async (resenaId) => {
-    if (resenaService?.eliminarResena) {
+  // =========================
+  // Cargar todas
+  // =========================
+
+  const cargarResenas =
+    useCallback(async () => {
       try {
-        await resenaService.eliminarResena(resenaId);
-      } catch (err) {
-        console.warn("Error eliminando en Firestore:", err.message);
-      }
-    }
+        setLoading(true);
+        setError(null);
 
-    setResenas((prev) => prev.filter((item) => item.id !== resenaId));
-  }, []);
+        const lista =
+          await obtenerTodasLasResenas();
+
+        setResenas(
+          Array.isArray(lista)
+            ? lista
+            : []
+        );
+
+        return lista;
+      } catch (err) {
+        const mensaje =
+          obtenerMensajeError(err);
+
+        console.log(
+          "Error cargando reseñas:",
+          {
+            mensaje,
+            estado:
+              err.response?.status,
+            datos:
+              err.response?.data,
+          }
+        );
+
+        setError(mensaje);
+        setResenas([]);
+
+        return [];
+      } finally {
+        setLoading(false);
+      }
+    }, []);
+
+  // =========================
+  // Cargar por pedido
+  // =========================
+
+  const cargarResenasPedido =
+    useCallback(async (pedidoId) => {
+      if (!pedidoId) {
+        setError(
+          "El ID del pedido es obligatorio."
+        );
+
+        return [];
+      }
+
+      try {
+        setLoading(true);
+        setError(null);
+
+        const lista =
+          await obtenerResenasPorPedido(
+            pedidoId
+          );
+
+        setResenas(
+          Array.isArray(lista)
+            ? lista
+            : []
+        );
+
+        return lista;
+      } catch (err) {
+        const mensaje =
+          obtenerMensajeError(err);
+
+        setError(mensaje);
+
+        return [];
+      } finally {
+        setLoading(false);
+      }
+    }, []);
+
+  // =========================
+  // Agregar reseña
+  // =========================
+
+  const agregarResena =
+    useCallback(
+      async (resenaData) => {
+        try {
+          setError(null);
+
+          console.log(
+            "Creando reseña desde contexto:",
+            resenaData
+          );
+
+          const nuevaResena =
+            await crearResena(
+              resenaData
+            );
+
+          setResenas(
+            (listaAnterior) => [
+              nuevaResena,
+              ...listaAnterior,
+            ]
+          );
+
+          /*
+           * Recarga para garantizar que el
+           * estado coincida con el backend.
+           */
+          await cargarResenas();
+
+          return nuevaResena;
+        } catch (err) {
+          const mensaje =
+            obtenerMensajeError(err);
+
+          console.log(
+            "Error agregando reseña:",
+            {
+              mensaje,
+              estado:
+                err.response?.status,
+              datos:
+                err.response?.data,
+            }
+          );
+
+          setError(mensaje);
+
+          throw err;
+        }
+      },
+      [cargarResenas]
+    );
+
+  // =========================
+  // Editar reseña
+  // =========================
+
+  const editarResena =
+    useCallback(
+      async (
+        resenaId,
+        datosActualizados
+      ) => {
+        try {
+          setError(null);
+
+          const actualizada =
+            await actualizarResena(
+              resenaId,
+              datosActualizados
+            );
+
+          setResenas(
+            (listaAnterior) =>
+              listaAnterior.map(
+                (resena) =>
+                  resena.id ===
+                  resenaId
+                    ? actualizada
+                    : resena
+              )
+          );
+
+          return actualizada;
+        } catch (err) {
+          const mensaje =
+            obtenerMensajeError(err);
+
+          setError(mensaje);
+
+          throw err;
+        }
+      },
+      []
+    );
+
+  // =========================
+  // Eliminar reseña
+  // =========================
+
+  const borrarResena =
+    useCallback(
+      async (resenaId) => {
+        try {
+          setError(null);
+
+          await eliminarResena(
+            resenaId
+          );
+
+          setResenas(
+            (listaAnterior) =>
+              listaAnterior.filter(
+                (resena) =>
+                  resena.id !==
+                  resenaId
+              )
+          );
+
+          return true;
+        } catch (err) {
+          const mensaje =
+            obtenerMensajeError(err);
+
+          setError(mensaje);
+
+          throw err;
+        }
+      },
+      []
+    );
+
+  // =========================
+  // Limpiar error
+  // =========================
+
+  const limpiarError =
+    useCallback(() => {
+      setError(null);
+    }, []);
+
+  // =========================
+  // Carga inicial
+  // =========================
+
+  useEffect(() => {
+    cargarResenas();
+  }, [cargarResenas]);
 
   return (
     <ResenaContext.Provider
@@ -128,10 +288,13 @@ export function ResenaProvider({ children }) {
         resenas,
         loading,
         error,
+
         cargarResenas,
+        cargarResenasPedido,
         agregarResena,
         editarResena,
         borrarResena,
+        limpiarError,
       }}
     >
       {children}

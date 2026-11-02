@@ -1,237 +1,422 @@
-// Servicio CRUD para la entidad Resena en Firestore
-// Colección: "Resena"
-// Campos:
-//   - Id_Cliente (referencia a documento en colección Usuario)
-//   - Id_Pedido (referencia a documento en colección Pedido)
-//   - calificacion (int64 — 1 a 5)
-//   - comentario (string)
-//   - fechaResena (timestamp)
-//   - id_repartidor (referencia a documento en colección Usuario)
+import api from "./api";
 
-import {
-  collection,
-  doc,
-  addDoc,
-  getDoc,
-  getDocs,
-  updateDoc,
-  deleteDoc,
-  query,
-  where,
-  orderBy,
-  onSnapshot,
-  Timestamp,
-} from "firebase/firestore";
-import { db } from "./firebaseConfig.js";
+// =========================
+// Convertir fecha
+// =========================
 
-const RESENA_COLLECTION = "Resena";
+const convertirFecha = (fecha) => {
+  if (!fecha) {
+    return null;
+  }
 
-/**
- * Crear una nueva reseña
- * @param {Object} resenaData
- * @param {string} resenaData.clienteId - ID del usuario cliente
- * @param {string} resenaData.pedidoId - ID del pedido
- * @param {number} resenaData.calificacion - Calificación 1-5
- * @param {string} resenaData.comentario - Comentario del usuario
- * @param {string} resenaData.repartidorId - ID del repartidor
- * @returns {Promise<string>} ID del documento creado
- */
-export async function crearResena(resenaData) {
+  // Timestamp serializado por Firebase Admin
+  if (
+    typeof fecha === "object" &&
+    fecha._seconds !== undefined
+  ) {
+    return new Date(
+      fecha._seconds * 1000
+    );
+  }
+
+  // Otra representación posible de Timestamp
+  if (
+    typeof fecha === "object" &&
+    fecha.seconds !== undefined
+  ) {
+    return new Date(
+      fecha.seconds * 1000
+    );
+  }
+
+  const fechaConvertida =
+    fecha instanceof Date
+      ? fecha
+      : new Date(fecha);
+
+  if (
+    Number.isNaN(
+      fechaConvertida.getTime()
+    )
+  ) {
+    return null;
+  }
+
+  return fechaConvertida;
+};
+
+// =========================
+// Normalizar reseña
+// =========================
+
+export const formatearResena = (
+  resena
+) => {
+  if (!resena) {
+    return null;
+  }
+
+  const fechaResena =
+    convertirFecha(
+      resena.fechaResena ||
+        resena.fecha_resena
+    );
+
+  return {
+    id: resena.id,
+
+    clienteId:
+      resena.clienteId ||
+      resena.Id_Cliente ||
+      null,
+
+    pedidoId:
+      resena.pedidoId ||
+      resena.Id_Pedido ||
+      null,
+
+    repartidorId:
+      resena.repartidorId ||
+      resena.id_repartidor ||
+      null,
+
+    calificacion:
+      Number(resena.calificacion) || 0,
+
+    comentario:
+      resena.comentario || "",
+
+    fechaResena,
+
+    fechaResenaFormateada:
+      fechaResena
+        ? fechaResena.toLocaleString(
+            "es-NI"
+          )
+        : "Fecha no disponible",
+  };
+};
+
+// =========================
+// Crear reseña
+// POST /api/resenas
+// =========================
+
+export async function crearResena(
+  resenaData
+) {
   try {
-    const resenaDoc = {
-      Id_Cliente: doc(db, "Usuario", resenaData.clienteId),
-      Id_Pedido: doc(db, "Pedido", resenaData.pedidoId),
-      calificacion: resenaData.calificacion || 5,
-      comentario: resenaData.comentario || "",
-      fechaResena: Timestamp.now(),
-      id_repartidor: doc(db, "Usuario", resenaData.repartidorId),
+    const calificacion = Number(
+      resenaData.calificacion
+    );
+
+    if (!resenaData.clienteId) {
+      throw new Error(
+        "El ID del cliente es obligatorio."
+      );
+    }
+
+    if (!resenaData.pedidoId) {
+      throw new Error(
+        "El ID del pedido es obligatorio."
+      );
+    }
+
+    if (
+      !Number.isInteger(calificacion) ||
+      calificacion < 1 ||
+      calificacion > 5
+    ) {
+      throw new Error(
+        "La calificación debe estar entre 1 y 5."
+      );
+    }
+
+    if (
+      !resenaData.comentario?.trim()
+    ) {
+      throw new Error(
+        "El comentario es obligatorio."
+      );
+    }
+
+    const cuerpo = {
+      clienteId:
+        resenaData.clienteId,
+
+      pedidoId:
+        resenaData.pedidoId,
+
+      calificacion,
+
+      comentario:
+        resenaData.comentario.trim(),
     };
 
-    const docRef = await addDoc(collection(db, RESENA_COLLECTION), resenaDoc);
-    console.log("Reseña creada con ID:", docRef.id);
-    return docRef.id;
-  } catch (error) {
-    console.error("Error al crear reseña:", error);
-    throw error;
-  }
-}
-
-/**
- * Obtener una reseña por su ID
- * @param {string} resenaId
- * @returns {Promise<Object|null>}
- */
-export async function obtenerResena(resenaId) {
-  try {
-    const docRef = doc(db, RESENA_COLLECTION, resenaId);
-    const docSnap = await getDoc(docRef);
-
-    if (docSnap.exists()) {
-      const data = docSnap.data();
-      return {
-        id: docSnap.id,
-        clienteId: data.Id_Cliente?.id || null,
-        pedidoId: data.Id_Pedido?.id || null,
-        calificacion: data.calificacion,
-        comentario: data.comentario,
-        fechaResena: data.fechaResena?.toDate() || null,
-        repartidorId: data.id_repartidor?.id || null,
-      };
+    /*
+     * El repartidor puede ser opcional si el
+     * pedido todavía no tiene uno asignado.
+     */
+    if (resenaData.repartidorId) {
+      cuerpo.repartidorId =
+        resenaData.repartidorId;
     }
 
-    return null;
+    console.log(
+      "POST /resenas:",
+      cuerpo
+    );
+
+    const respuesta = await api.post(
+      "/resenas",
+      cuerpo
+    );
+
+    console.log(
+      "Respuesta al crear reseña:",
+      respuesta.data
+    );
+
+    const datosResena =
+      respuesta.data.resena || {};
+
+    return formatearResena({
+      id:
+        respuesta.data.id ||
+        datosResena.id,
+
+      ...cuerpo,
+      ...datosResena,
+    });
   } catch (error) {
-    console.error("Error al obtener reseña:", error);
+    console.log(
+      "Error creando reseña:",
+      {
+        mensaje:
+          error.response?.data
+            ?.mensaje ||
+          error.response?.data?.error ||
+          error.message,
+
+        estado:
+          error.response?.status,
+
+        datos:
+          error.response?.data,
+      }
+    );
+
     throw error;
   }
 }
 
-/**
- * Obtener todas las reseñas
- * @returns {Promise<Array>}
- */
+// =========================
+// Obtener todas las reseñas
+// GET /api/resenas
+// =========================
+
 export async function obtenerTodasLasResenas() {
   try {
-    const querySnapshot = await getDocs(collection(db, RESENA_COLLECTION));
-    const resenas = [];
-
-    querySnapshot.forEach((docSnap) => {
-      const data = docSnap.data();
-      resenas.push({
-        id: docSnap.id,
-        clienteId: data.Id_Cliente?.id || null,
-        pedidoId: data.Id_Pedido?.id || null,
-        calificacion: data.calificacion,
-        comentario: data.comentario,
-        fechaResena: data.fechaResena?.toDate() || null,
-        repartidorId: data.id_repartidor?.id || null,
-      });
-    });
-
-    return resenas;
-  } catch (error) {
-    console.error("Error al obtener reseñas:", error);
-    throw error;
-  }
-}
-
-/**
- * Obtener reseñas por pedido
- * @param {string} pedidoId
- * @returns {Promise<Array>}
- */
-export async function obtenerResenasPorPedido(pedidoId) {
-  try {
-    const pedidoRef = doc(db, "Pedido", pedidoId);
-    const q = query(
-      collection(db, RESENA_COLLECTION),
-      where("Id_Pedido", "==", pedidoRef)
+    const respuesta = await api.get(
+      "/resenas"
     );
-    const querySnapshot = await getDocs(q);
-    const resenas = [];
 
-    querySnapshot.forEach((docSnap) => {
-      const data = docSnap.data();
-      resenas.push({
-        id: docSnap.id,
-        clienteId: data.Id_Cliente?.id || null,
-        pedidoId: data.Id_Pedido?.id || null,
-        calificacion: data.calificacion,
-        comentario: data.comentario,
-        fechaResena: data.fechaResena?.toDate() || null,
-        repartidorId: data.id_repartidor?.id || null,
-      });
-    });
+    const lista = Array.isArray(
+      respuesta.data
+    )
+      ? respuesta.data
+      : respuesta.data.resenas || [];
 
-    return resenas;
+    return lista
+      .map(formatearResena)
+      .filter(Boolean);
   } catch (error) {
-    console.error("Error al obtener reseñas por pedido:", error);
+    console.log(
+      "Error obteniendo reseñas:",
+      {
+        mensaje:
+          error.response?.data
+            ?.mensaje ||
+          error.response?.data?.error ||
+          error.message,
+
+        estado:
+          error.response?.status,
+
+        datos:
+          error.response?.data,
+      }
+    );
+
     throw error;
   }
 }
 
-/**
- * Escuchar cambios en tiempo real de todas las reseñas
- * @param {Function} callback
- * @returns {Function} unsubscribe
- */
-export function escucharResenas(callback) {
-  const q = collection(db, RESENA_COLLECTION);
+// Alias de compatibilidad
+export const obtenerResenas =
+  obtenerTodasLasResenas;
 
-  const unsubscribe = onSnapshot(
-    q,
-    (querySnapshot) => {
-      const resenas = [];
+// =========================
+// Obtener una reseña
+// GET /api/resenas/:id
+// =========================
 
-      querySnapshot.forEach((docSnap) => {
-        const data = docSnap.data();
-        resenas.push({
-          id: docSnap.id,
-          clienteId: data.Id_Cliente?.id || null,
-          pedidoId: data.Id_Pedido?.id || null,
-          calificacion: data.calificacion,
-          comentario: data.comentario,
-          fechaResena: data.fechaResena?.toDate() || null,
-          repartidorId: data.id_repartidor?.id || null,
-        });
-      });
-
-      callback(resenas);
-    },
-    (error) => {
-      console.error("Error al escuchar reseñas:", error);
-    }
-  );
-
-  return unsubscribe;
-}
-
-/**
- * Actualizar una reseña
- * @param {string} resenaId
- * @param {Object} datosActualizados
- * @returns {Promise<void>}
- */
-export async function actualizarResena(resenaId, datosActualizados) {
+export async function obtenerResena(
+  resenaId
+) {
   try {
-    const docRef = doc(db, RESENA_COLLECTION, resenaId);
-    const updateData = {};
+    const respuesta = await api.get(
+      `/resenas/${resenaId}`
+    );
 
-    if (datosActualizados.clienteId !== undefined) {
-      updateData.Id_Cliente = doc(db, "Usuario", datosActualizados.clienteId);
-    }
-    if (datosActualizados.pedidoId !== undefined) {
-      updateData.Id_Pedido = doc(db, "Pedido", datosActualizados.pedidoId);
-    }
-    if (datosActualizados.calificacion !== undefined) {
-      updateData.calificacion = datosActualizados.calificacion;
-    }
-    if (datosActualizados.comentario !== undefined) {
-      updateData.comentario = datosActualizados.comentario;
-    }
-    if (datosActualizados.repartidorId !== undefined) {
-      updateData.id_repartidor = doc(db, "Usuario", datosActualizados.repartidorId);
-    }
-
-    await updateDoc(docRef, updateData);
-    console.log("Reseña actualizada:", resenaId);
+    return formatearResena(
+      respuesta.data.resena ||
+        respuesta.data
+    );
   } catch (error) {
-    console.error("Error al actualizar reseña:", error);
+    if (
+      error.response?.status === 404
+    ) {
+      return null;
+    }
+
+    console.log(
+      "Error obteniendo reseña:",
+      error.response?.data ||
+        error.message
+    );
+
     throw error;
   }
 }
 
-/**
- * Eliminar una reseña
- * @param {string} resenaId
- * @returns {Promise<void>}
- */
-export async function eliminarResena(resenaId) {
+// =========================
+// Obtener reseñas por pedido
+// GET /api/resenas/pedido/:pedidoId
+// =========================
+
+export async function obtenerResenasPorPedido(
+  pedidoId
+) {
   try {
-    await deleteDoc(doc(db, RESENA_COLLECTION, resenaId));
-    console.log("Reseña eliminada:", resenaId);
+    if (!pedidoId) {
+      throw new Error(
+        "El ID del pedido es obligatorio."
+      );
+    }
+
+    const respuesta = await api.get(
+      `/resenas/pedido/${pedidoId}`
+    );
+
+    const lista = Array.isArray(
+      respuesta.data
+    )
+      ? respuesta.data
+      : respuesta.data.resenas || [];
+
+    return lista
+      .map(formatearResena)
+      .filter(Boolean);
   } catch (error) {
-    console.error("Error al eliminar reseña:", error);
+    console.log(
+      "Error obteniendo reseñas del pedido:",
+      error.response?.data ||
+        error.message
+    );
+
+    throw error;
+  }
+}
+
+// =========================
+// Actualizar reseña
+// PATCH /api/resenas/:id
+// =========================
+
+export async function actualizarResena(
+  resenaId,
+  datosActualizados
+) {
+  try {
+    const cuerpo = {};
+
+    if (
+      datosActualizados.calificacion !==
+      undefined
+    ) {
+      const calificacion = Number(
+        datosActualizados.calificacion
+      );
+
+      if (
+        !Number.isInteger(
+          calificacion
+        ) ||
+        calificacion < 1 ||
+        calificacion > 5
+      ) {
+        throw new Error(
+          "La calificación debe estar entre 1 y 5."
+        );
+      }
+
+      cuerpo.calificacion =
+        calificacion;
+    }
+
+    if (
+      datosActualizados.comentario !==
+      undefined
+    ) {
+      cuerpo.comentario =
+        datosActualizados.comentario.trim();
+    }
+
+    const respuesta = await api.patch(
+      `/resenas/${resenaId}`,
+      cuerpo
+    );
+
+    return formatearResena(
+      respuesta.data.resena || {
+        id: resenaId,
+        ...datosActualizados,
+        ...cuerpo,
+      }
+    );
+  } catch (error) {
+    console.log(
+      "Error actualizando reseña:",
+      error.response?.data ||
+        error.message
+    );
+
+    throw error;
+  }
+}
+
+// =========================
+// Eliminar reseña
+// DELETE /api/resenas/:id
+// =========================
+
+export async function eliminarResena(
+  resenaId
+) {
+  try {
+    const respuesta = await api.delete(
+      `/resenas/${resenaId}`
+    );
+
+    return respuesta.data;
+  } catch (error) {
+    console.log(
+      "Error eliminando reseña:",
+      error.response?.data ||
+        error.message
+    );
+
     throw error;
   }
 }
