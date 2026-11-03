@@ -301,7 +301,8 @@ export async function obtenerPedido(id) {
 }
 
 // =========================
-// Obtener pedidos de usuario
+// Obtener pedidos por usuario
+// GET /api/pedidos/usuario/:usuarioId
 // =========================
 
 export async function obtenerPedidosUsuario(
@@ -318,20 +319,63 @@ export async function obtenerPedidosUsuario(
       `/pedidos/usuario/${usuarioId}`
     );
 
-    const datos = Array.isArray(
+    const lista = Array.isArray(
       respuesta.data
     )
       ? respuesta.data
-      : [];
+      : respuesta.data.pedidos || [];
 
-    return datos.map(
-      formatearPedidoDoc
-    );
+    return lista.map((pedido) => ({
+      ...pedido,
+
+      id: pedido.id,
+
+      usuarioId:
+        pedido.usuarioId ||
+        pedido.Id_Usuario ||
+        null,
+
+      Producto:
+        pedido.Producto ||
+        pedido.producto ||
+        null,
+
+      Ubicacion:
+        pedido.Ubicacion ||
+        pedido.ubicacion ||
+        null,
+
+      cantidad:
+        Number(pedido.cantidad) || 0,
+
+      costoEnvio:
+        Number(pedido.costoEnvio) || 0,
+
+      subtotal:
+        Number(pedido.subtotal) || 0,
+
+      total:
+        Number(pedido.total) || 0,
+
+      estado:
+        pedido.estado ||
+        "pendiente",
+    }));
   } catch (error) {
-    console.error(
-      "Error al obtener pedidos del usuario:",
-      error.response?.data ||
-        error.message
+    console.log(
+      "Error obteniendo pedidos del usuario:",
+      {
+        mensaje:
+          error.response?.data?.mensaje ||
+          error.response?.data?.error ||
+          error.message,
+
+        estado:
+          error.response?.status,
+
+        datos:
+          error.response?.data,
+      }
     );
 
     throw error;

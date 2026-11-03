@@ -19,6 +19,7 @@ import PerfilScreen from "./src/screens/PerfilScreen";
 import PerfilAdminScreen from "./src/screens/PerfilAdminScreen";
 import MapaSeguimientoScreen from "./src/screens/MapaSeguimientoScreen";
 import RegisterScreen from "./src/screens/RegisterScreen";
+import MisPedidosScreen from "./src/screens/MisPedidosScreen";
 
 import { AuthProvider } from "./src/context/AuthContext";
 import { CartProvider } from "./src/context/CartContext";
@@ -127,6 +128,25 @@ function MainTabs() {
       />
 
       <Tab.Screen
+        name="MisPedidos"
+        component={MisPedidosScreen}
+        options={{
+          title: "Mis pedidos",
+
+          tabBarIcon: ({
+            color,
+            size,
+          }) => (
+            <Ionicons
+              name="receipt-outline"
+              color={color}
+              size={size}
+            />
+          ),
+        }}
+      />
+
+      <Tab.Screen
         name="Admin"
         component={AdminStack}
         options={({ route }) => {
@@ -153,13 +173,13 @@ export default function App() {
     <View style={styles.webContainer}>
       <View style={styles.phoneContainer}>
         <AuthProvider>
-            <PedidoProvider>
-              <RutaProvider>
-                <ResenaProvider>
-                  <IncidenciaProvider>
-                    <HistorialProvider>
-                      <CartProvider>
-                        <ProductProvider>
+          <PedidoProvider>
+            <RutaProvider>
+              <ResenaProvider>
+                <IncidenciaProvider>
+                  <HistorialProvider>
+                    <CartProvider>
+                      <ProductProvider>
                         <NavigationContainer>
                           <Stack.Navigator
                             screenOptions={{
@@ -170,48 +190,55 @@ export default function App() {
                               name="Login"
                               component={LoginScreen}
                             />
+
                             <Stack.Screen
                               name="Register"
                               component={RegisterScreen}
                             />
+
                             <Stack.Screen
                               name="MainTabs"
                               component={MainTabs}
                             />
+
                             <Stack.Screen
                               name="Cart"
                               component={CartScreen}
                             />
+
                             <Stack.Screen
                               name="Delivery"
                               component={DeliveryScreen}
                             />
+
                             <Stack.Screen
                               name="OrderStatus"
                               component={OrderStatusScreen}
                             />
+
                             <Stack.Screen
                               name="Resena"
                               component={ResenaScreen}
                             />
+
                             <Stack.Screen
                               name="Incidencia"
                               component={IncidenciaScreen}
                             />
+
                             <Stack.Screen
                               name="MapaSeguimiento"
                               component={MapaSeguimientoScreen}
                             />
                           </Stack.Navigator>
                         </NavigationContainer>
-                        </ProductProvider>
-                      </CartProvider>
-                    </HistorialProvider>
-                  </IncidenciaProvider>
-                </ResenaProvider>
-              </RutaProvider>
-            </PedidoProvider>
-          
+                      </ProductProvider>
+                    </CartProvider>
+                  </HistorialProvider>
+                </IncidenciaProvider>
+              </ResenaProvider>
+            </RutaProvider>
+          </PedidoProvider>
         </AuthProvider>
       </View>
     </View>

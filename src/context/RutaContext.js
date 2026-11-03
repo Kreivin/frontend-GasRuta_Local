@@ -8,6 +8,7 @@ import React, {
 import {
   crearRuta,
   obtenerTodasLasRutas,
+  obtenerRutaPorPedido,
   actualizarRuta,
   eliminarRuta,
   iniciarRuta,
@@ -35,17 +36,21 @@ export function RutaProvider({
   const [error, setError] =
     useState(null);
 
+  // =========================
+  // Obtener mensaje de error
+  // =========================
+
   const obtenerMensaje = (err) => {
     return (
       err.response?.data?.mensaje ||
       err.response?.data?.error ||
       err.message ||
-      "Ocurrió un error con las rutas"
+      "Ocurrió un error con las rutas."
     );
   };
 
   // =========================
-  // Cargar rutas
+  // Cargar todas las rutas
   // =========================
 
   const cargarRutas =
@@ -57,13 +62,16 @@ export function RutaProvider({
         const lista =
           await obtenerTodasLasRutas();
 
-        setRutas(
+        const rutasObtenidas =
           Array.isArray(lista)
             ? lista
-            : []
+            : [];
+
+        setRutas(
+          rutasObtenidas
         );
 
-        return lista;
+        return rutasObtenidas;
       } catch (err) {
         const mensaje =
           obtenerMensaje(err);
@@ -89,6 +97,105 @@ export function RutaProvider({
     }, []);
 
   // =========================
+  // Cargar rutas de varios pedidos
+  // =========================
+
+  const cargarRutasPedidos =
+    useCallback(
+      async (pedidosUsuario) => {
+        try {
+          setLoading(true);
+          setError(null);
+
+          if (
+            !Array.isArray(
+              pedidosUsuario
+            ) ||
+            pedidosUsuario.length === 0
+          ) {
+            setRutas([]);
+            return [];
+          }
+
+          const pedidosValidos =
+            pedidosUsuario.filter(
+              (pedido) =>
+                pedido?.id
+            );
+
+          const resultados =
+            await Promise.all(
+              pedidosValidos.map(
+                async (pedido) => {
+                  try {
+                    return await obtenerRutaPorPedido(
+                      pedido.id
+                    );
+                  } catch (err) {
+                    console.log(
+                      `No se pudo cargar la ruta del pedido ${pedido.id}:`,
+                      obtenerMensaje(err)
+                    );
+
+                    return [];
+                  }
+                }
+              )
+            );
+
+          const rutasEncontradas =
+            resultados
+              .flat()
+              .filter(
+                (ruta) =>
+                  ruta?.id
+              );
+
+          /*
+           * Evita rutas duplicadas.
+           */
+          const rutasUnicas =
+            Array.from(
+              new Map(
+                rutasEncontradas.map(
+                  (ruta) => [
+                    ruta.id,
+                    ruta,
+                  ]
+                )
+              ).values()
+            );
+
+          setRutas(rutasUnicas);
+
+          return rutasUnicas;
+        } catch (err) {
+          const mensaje =
+            obtenerMensaje(err);
+
+          console.log(
+            "Error cargando rutas de los pedidos:",
+            {
+              mensaje,
+              estado:
+                err.response?.status,
+              datos:
+                err.response?.data,
+            }
+          );
+
+          setError(mensaje);
+          setRutas([]);
+
+          return [];
+        } finally {
+          setLoading(false);
+        }
+      },
+      []
+    );
+
+  // =========================
   // Agregar ruta
   // =========================
 
@@ -99,28 +206,31 @@ export function RutaProvider({
           setError(null);
 
           const nuevaRuta =
-            await crearRuta(rutaData);
+            await crearRuta(
+              rutaData
+            );
 
           setRutas(
             (listaAnterior) => [
               nuevaRuta,
-              ...listaAnterior,
+              ...listaAnterior.filter(
+                (ruta) =>
+                  ruta.id !==
+                  nuevaRuta.id
+              ),
             ]
           );
 
-          await cargarRutas();
-
           return nuevaRuta;
         } catch (err) {
-          const mensaje =
-            obtenerMensaje(err);
-
-          setError(mensaje);
+          setError(
+            obtenerMensaje(err)
+          );
 
           throw err;
         }
       },
-      [cargarRutas]
+      []
     );
 
   // =========================
@@ -147,12 +257,14 @@ export function RutaProvider({
               listaAnterior.map(
                 (ruta) =>
                   ruta.id === rutaId
-                    ? rutaActualizada
+                    ? {
+                        ...ruta,
+                        ...rutaActualizada,
+                        id: rutaId,
+                      }
                     : ruta
               )
           );
-
-          await cargarRutas();
 
           return rutaActualizada;
         } catch (err) {
@@ -163,7 +275,7 @@ export function RutaProvider({
           throw err;
         }
       },
-      [cargarRutas]
+      []
     );
 
   // =========================
@@ -175,7 +287,9 @@ export function RutaProvider({
       try {
         setError(null);
 
-        await eliminarRuta(rutaId);
+        await eliminarRuta(
+          rutaId
+        );
 
         setRutas(
           (listaAnterior) =>
@@ -196,7 +310,7 @@ export function RutaProvider({
     }, []);
 
   // =========================
-  // Iniciar una ruta
+  // Iniciar ruta
   // =========================
 
   const comenzarRuta =
@@ -206,9 +320,23 @@ export function RutaProvider({
           setError(null);
 
           const actualizada =
-            await iniciarRuta(rutaId);
+            await iniciarRuta(
+              rutaId
+            );
 
-          await cargarRutas();
+          setRutas(
+            (listaAnterior) =>
+              listaAnterior.map(
+                (ruta) =>
+                  ruta.id === rutaId
+                    ? {
+                        ...ruta,
+                        ...actualizada,
+                        id: rutaId,
+                      }
+                    : ruta
+              )
+          );
 
           return actualizada;
         } catch (err) {
@@ -219,11 +347,11 @@ export function RutaProvider({
           throw err;
         }
       },
-      [cargarRutas]
+      []
     );
 
   // =========================
-  // Finalizar una ruta
+  // Finalizar ruta
   // =========================
 
   const completarRuta =
@@ -237,7 +365,19 @@ export function RutaProvider({
               rutaId
             );
 
-          await cargarRutas();
+          setRutas(
+            (listaAnterior) =>
+              listaAnterior.map(
+                (ruta) =>
+                  ruta.id === rutaId
+                    ? {
+                        ...ruta,
+                        ...actualizada,
+                        id: rutaId,
+                      }
+                    : ruta
+              )
+          );
 
           return actualizada;
         } catch (err) {
@@ -248,11 +388,11 @@ export function RutaProvider({
           throw err;
         }
       },
-      [cargarRutas]
+      []
     );
 
   // =========================
-  // Actualizar GPS
+  // Actualizar ubicación
   // =========================
 
   const actualizarUbicacion =
@@ -272,7 +412,11 @@ export function RutaProvider({
               listaAnterior.map(
                 (ruta) =>
                   ruta.id === rutaId
-                    ? rutaActualizada
+                    ? {
+                        ...ruta,
+                        ...rutaActualizada,
+                        id: rutaId,
+                      }
                     : ruta
               )
           );
@@ -305,7 +449,7 @@ export function RutaProvider({
     );
 
   // =========================
-  // Iniciar rastreo
+  // Iniciar rastreo GPS
   // =========================
 
   const iniciarRastreo =
@@ -322,15 +466,27 @@ export function RutaProvider({
       []
     );
 
+  // =========================
+  // Refrescar
+  // =========================
+
   const refrescarRutas =
     useCallback(async () => {
       return cargarRutas();
     }, [cargarRutas]);
 
+  // =========================
+  // Limpiar error
+  // =========================
+
   const limpiarError =
     useCallback(() => {
       setError(null);
     }, []);
+
+  // =========================
+  // Carga inicial
+  // =========================
 
   useEffect(() => {
     cargarRutas();
@@ -344,7 +500,9 @@ export function RutaProvider({
         error,
 
         cargarRutas,
+        cargarRutasPedidos,
         refrescarRutas,
+
         agregarRuta,
         editarRuta,
         borrarRuta,

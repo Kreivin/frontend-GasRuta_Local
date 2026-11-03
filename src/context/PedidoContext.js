@@ -5,190 +5,383 @@ import React, {
   useState,
 } from "react";
 
-import api from "../services/api";
+import {
+  crearPedido as crearPedidoServicio,
+  obtenerPedidos,
+  obtenerPedidosUsuario,
+  actualizarPedido as actualizarPedidoServicio,
+  actualizarEstadoPedido as actualizarEstadoPedidoServicio,
+  eliminarPedido as eliminarPedidoServicio,
+} from "../services/pedidoService";
 
-export const PedidoContext = createContext();
+export const PedidoContext =
+  createContext();
 
-export function PedidoProvider({ children }) {
-  const [pedidos, setPedidos] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+export function PedidoProvider({
+  children,
+}) {
+  const [pedidos, setPedidos] =
+    useState([]);
 
-  const obtenerMensajeError = (err) => {
+  const [loading, setLoading] =
+    useState(false);
+
+  const [error, setError] =
+    useState(null);
+
+  // =========================
+  // Obtener mensaje de error
+  // =========================
+
+  const obtenerMensajeError = (
+    err
+  ) => {
     return (
       err.response?.data?.mensaje ||
       err.response?.data?.error ||
       err.message ||
-      "Ocurrió un error con los pedidos"
+      "Ocurrió un error con los pedidos."
     );
   };
 
   // =========================
   // Cargar todos los pedidos
   // =========================
-  const cargarPedidos = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
 
-      const respuesta = await api.get("/pedidos");
+  const cargarPedidos =
+    useCallback(async () => {
+      try {
+        setLoading(true);
+        setError(null);
 
-      const lista = Array.isArray(respuesta.data)
-        ? respuesta.data
-        : respuesta.data.pedidos || [];
+        const lista =
+          await obtenerPedidos();
 
-      setPedidos(lista);
+        const pedidosObtenidos =
+          Array.isArray(lista)
+            ? lista
+            : [];
 
-      return lista;
-    } catch (err) {
-      const mensaje = obtenerMensajeError(err);
+        setPedidos(
+          pedidosObtenidos
+        );
 
-      console.log("Error cargando pedidos:", {
-        mensaje,
-        estado: err.response?.status,
-        datos: err.response?.data,
-      });
+        return pedidosObtenidos;
+      } catch (err) {
+        const mensaje =
+          obtenerMensajeError(err);
 
-      setError(mensaje);
-      setPedidos([]);
+        console.log(
+          "Error cargando pedidos:",
+          {
+            mensaje,
+            estado:
+              err.response?.status,
+            datos:
+              err.response?.data,
+          }
+        );
 
-      return [];
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+        setError(mensaje);
+        setPedidos([]);
+
+        return [];
+      } finally {
+        setLoading(false);
+      }
+    }, []);
+
+  // =========================
+  // Cargar pedidos del usuario
+  // =========================
+
+  const cargarPedidosUsuario =
+    useCallback(async (usuarioId) => {
+      if (!usuarioId) {
+        const mensaje =
+          "No se encontró el usuario autenticado.";
+
+        setError(mensaje);
+
+        return [];
+      }
+
+      try {
+        setLoading(true);
+        setError(null);
+
+        const lista =
+          await obtenerPedidosUsuario(
+            usuarioId
+          );
+
+        const pedidosUsuario =
+          Array.isArray(lista)
+            ? lista
+            : [];
+
+        setPedidos(
+          pedidosUsuario
+        );
+
+        return pedidosUsuario;
+      } catch (err) {
+        const mensaje =
+          obtenerMensajeError(err);
+
+        console.log(
+          "Error cargando pedidos del usuario:",
+          {
+            usuarioId,
+            mensaje,
+            estado:
+              err.response?.status,
+            datos:
+              err.response?.data,
+          }
+        );
+
+        setError(mensaje);
+        setPedidos([]);
+
+        return [];
+      } finally {
+        setLoading(false);
+      }
+    }, []);
 
   // =========================
   // Crear pedido
   // =========================
-  const crearPedido = useCallback(
-    async (datos) => {
+
+  const crearPedido =
+    useCallback(async (datos) => {
       try {
         setError(null);
 
         console.log(
-          "PedidoContext enviando al backend:",
+          "PedidoContext enviando:",
           datos
         );
 
-        const respuesta = await api.post(
-          "/pedidos",
-          datos
-        );
+        const resultado =
+          await crearPedidoServicio(
+            datos
+          );
 
         console.log(
-          "PedidoContext respuesta:",
-          respuesta.data
+          "Pedido creado:",
+          resultado
         );
 
-        const pedidoCreado = {
-          id: respuesta.data.id,
-          ...(respuesta.data.pedido || {}),
-        };
+        const pedidoCreado =
+          resultado?.pedido || resultado;
 
-        setPedidos((listaAnterior) => [
-          pedidoCreado,
-          ...listaAnterior,
-        ]);
+        if (pedidoCreado?.id) {
+          setPedidos(
+            (listaAnterior) => [
+              pedidoCreado,
+              ...listaAnterior.filter(
+                (pedido) =>
+                  pedido.id !==
+                  pedidoCreado.id
+              ),
+            ]
+          );
+        }
 
-        return {
-          ...respuesta.data,
-          pedido: pedidoCreado,
-        };
+        return resultado;
       } catch (err) {
-        const mensaje = obtenerMensajeError(err);
+        const mensaje =
+          obtenerMensajeError(err);
 
-        console.log("Error creando pedido:", {
-          mensaje,
-          estado: err.response?.status,
-          datos: err.response?.data,
-          ruta: err.config?.url,
-        });
+        console.log(
+          "Error creando pedido:",
+          {
+            mensaje,
+            estado:
+              err.response?.status,
+            datos:
+              err.response?.data,
+          }
+        );
 
         setError(mensaje);
 
         throw err;
       }
-    },
-    []
-  );
+    }, []);
+
+  // Nombre compatible con código anterior
+  const crearNuevoPedido =
+    crearPedido;
+
+  // Nombre compatible con otras pantallas
+  const agregarPedido =
+    crearPedido;
 
   // =========================
   // Actualizar pedido
   // =========================
-  const actualizarPedido = useCallback(
-    async (id, datos) => {
-      try {
-        setError(null);
 
-        const respuesta = await api.patch(
-          `/pedidos/${id}`,
-          datos
-        );
+  const actualizarPedido =
+    useCallback(
+      async (id, datos) => {
+        try {
+          setError(null);
 
-        await cargarPedidos();
+          const resultado =
+            await actualizarPedidoServicio(
+              id,
+              datos
+            );
 
-        return respuesta.data;
-      } catch (err) {
-        setError(obtenerMensajeError(err));
-        throw err;
-      }
-    },
-    [cargarPedidos]
-  );
+          const actualizado =
+            resultado?.pedido ||
+            resultado;
+
+          setPedidos(
+            (listaAnterior) =>
+              listaAnterior.map(
+                (pedido) =>
+                  pedido.id === id
+                    ? {
+                        ...pedido,
+                        ...actualizado,
+                        id,
+                      }
+                    : pedido
+              )
+          );
+
+          return resultado;
+        } catch (err) {
+          setError(
+            obtenerMensajeError(err)
+          );
+
+          throw err;
+        }
+      },
+      []
+    );
+
+  // Nombre compatible con código anterior
+  const editarPedido =
+    actualizarPedido;
 
   // =========================
   // Actualizar estado
   // =========================
-  const actualizarEstadoPedido = useCallback(
-    async (id, estado) => {
-      try {
-        setError(null);
 
-        const respuesta = await api.patch(
-          `/pedidos/${id}/estado`,
-          {
-            estado,
-          }
+  const actualizarEstadoPedido =
+    useCallback(
+      async (id, estado) => {
+        try {
+          setError(null);
+
+          const resultado =
+            await actualizarEstadoPedidoServicio(
+              id,
+              estado
+            );
+
+          setPedidos(
+            (listaAnterior) =>
+              listaAnterior.map(
+                (pedido) =>
+                  pedido.id === id
+                    ? {
+                        ...pedido,
+                        estado,
+                      }
+                    : pedido
+              )
+          );
+
+          return resultado;
+        } catch (err) {
+          setError(
+            obtenerMensajeError(err)
+          );
+
+          throw err;
+        }
+      },
+      []
+    );
+
+  // Nombre utilizado por VistaAdminScreen
+  const cambiarEstado =
+    actualizarEstadoPedido;
+
+  // Nombre compatible con otras pantallas
+  const cambiarEstadoPedido =
+    actualizarEstadoPedido;
+
+  // =========================
+  // Cancelar pedido
+  // =========================
+
+  const cancelarPedido =
+    useCallback(
+      async (id) => {
+        return actualizarEstadoPedido(
+          id,
+          "cancelado"
         );
-
-        await cargarPedidos();
-
-        return respuesta.data;
-      } catch (err) {
-        setError(obtenerMensajeError(err));
-        throw err;
-      }
-    },
-    [cargarPedidos]
-  );
+      },
+      [actualizarEstadoPedido]
+    );
 
   // =========================
   // Eliminar pedido
   // =========================
-  const eliminarPedido = useCallback(
-    async (id) => {
+
+  const eliminarPedido =
+    useCallback(async (id) => {
       try {
         setError(null);
 
-        const respuesta = await api.delete(
-          `/pedidos/${id}`
+        const resultado =
+          await eliminarPedidoServicio(
+            id
+          );
+
+        setPedidos(
+          (listaAnterior) =>
+            listaAnterior.filter(
+              (pedido) =>
+                pedido.id !== id
+            )
         );
 
-        setPedidos((listaAnterior) =>
-          listaAnterior.filter(
-            (pedido) => pedido.id !== id
-          )
-        );
-
-        return respuesta.data;
+        return resultado;
       } catch (err) {
-        setError(obtenerMensajeError(err));
+        setError(
+          obtenerMensajeError(err)
+        );
+
         throw err;
       }
-    },
-    []
-  );
+    }, []);
+
+  // Nombre utilizado por VistaAdminScreen
+  const borrarPedido =
+    eliminarPedido;
+
+  // =========================
+  // Limpiar error
+  // =========================
+
+  const limpiarError =
+    useCallback(() => {
+      setError(null);
+    }, []);
+
+  // =========================
+  // Carga inicial
+  // =========================
 
   useEffect(() => {
     cargarPedidos();
@@ -200,11 +393,26 @@ export function PedidoProvider({ children }) {
         pedidos,
         loading,
         error,
+
         cargarPedidos,
+        cargarPedidosUsuario,
+
         crearPedido,
+        crearNuevoPedido,
+        agregarPedido,
+
         actualizarPedido,
+        editarPedido,
+
         actualizarEstadoPedido,
+        cambiarEstadoPedido,
+        cambiarEstado,
+        cancelarPedido,
+
         eliminarPedido,
+        borrarPedido,
+
+        limpiarError,
       }}
     >
       {children}

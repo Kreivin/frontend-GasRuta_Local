@@ -256,8 +256,10 @@ export async function obtenerRuta(rutaId) {
   }
 }
 
+
+
 // =========================
-// Obtener ruta por pedido
+// Obtener rutas por pedido
 // GET /api/rutas/pedido/:pedidoId
 // =========================
 
@@ -265,40 +267,90 @@ export async function obtenerRutaPorPedido(
   pedidoId
 ) {
   try {
+    if (!pedidoId) {
+      throw new Error(
+        "El ID del pedido es obligatorio."
+      );
+    }
+
     const respuesta = await api.get(
       `/rutas/pedido/${pedidoId}`
     );
 
-    return formatearRuta(
-      respuesta.data
-    );
+    const datos =
+      respuesta.data;
+
+    /*
+     * El backend puede devolver:
+     *
+     * 1. Un arreglo de rutas.
+     * 2. { rutas: [...] }
+     * 3. { ruta: {...} }
+     * 4. Una ruta directamente.
+     */
+
+    if (Array.isArray(datos)) {
+      return datos
+        .map(formatearRuta)
+        .filter(Boolean);
+    }
+
+    if (
+      Array.isArray(datos?.rutas)
+    ) {
+      return datos.rutas
+        .map(formatearRuta)
+        .filter(Boolean);
+    }
+
+    const rutaUnica =
+      datos?.ruta || datos;
+
+    const rutaFormateada =
+      formatearRuta(
+        rutaUnica
+      );
+
+    return rutaFormateada
+      ? [rutaFormateada]
+      : [];
   } catch (error) {
     if (
       error.response?.status === 404
     ) {
-      return null;
+      return [];
     }
 
     console.log(
-      "Error al obtener ruta del pedido:",
-      error.response?.data ||
-      error.message
+      "Error obteniendo rutas del pedido:",
+      {
+        pedidoId,
+
+        mensaje:
+          error.response?.data
+            ?.mensaje ||
+          error.response?.data?.error ||
+          error.message,
+
+        estado:
+          error.response?.status,
+
+        datos:
+          error.response?.data,
+      }
     );
 
     throw error;
   }
 }
 
-// Compatibilidad con el nombre antiguo
+// Compatibilidad con el nombre anterior
 export async function obtenerRutasPorPedido(
   pedidoId
 ) {
-  const ruta =
-    await obtenerRutaPorPedido(
-      pedidoId
-    );
-
-  return ruta ? [ruta] : [];
+  return obtenerRutaPorPedido(
+    pedidoId
+  );
 }
 
 // =========================
@@ -612,10 +664,25 @@ export function abrirNavegacionGoogleMaps(
   latitud,
   longitud
 ) {
+  const latitudNumero =
+    Number(latitud);
+
+  const longitudNumero =
+    Number(longitud);
+
+  if (
+    Number.isNaN(latitudNumero) ||
+    Number.isNaN(longitudNumero)
+  ) {
+    throw new Error(
+      "Las coordenadas no son válidas."
+    );
+  }
+
   const url =
-    `https://www.google.com/maps/dir/` +
-    `?api=1&destination=${latitud},${longitud}` +
-    `&travelmode=driving`;
+    "https://www.google.com/maps/dir/" +
+    `?api=1&destination=${latitudNumero},${longitudNumero}` +
+    "&travelmode=driving";
 
   return Linking.openURL(url);
 }
@@ -628,15 +695,30 @@ export function abrirEnGoogleMaps(
   latitud,
   longitud
 ) {
+  const latitudNumero =
+    Number(latitud);
+
+  const longitudNumero =
+    Number(longitud);
+
+  if (
+    Number.isNaN(latitudNumero) ||
+    Number.isNaN(longitudNumero)
+  ) {
+    throw new Error(
+      "Las coordenadas no son válidas."
+    );
+  }
+
   const url =
-    `https://www.google.com/maps?q=` +
-    `${latitud},${longitud}`;
+    "https://www.google.com/maps?q=" +
+    `${latitudNumero},${longitudNumero}`;
 
   return Linking.openURL(url);
 }
 
 // =========================
-// Compartir por WhatsApp
+// Compartir ubicación por WhatsApp
 // =========================
 
 export async function compartirUbicacionWhatsApp({
@@ -644,22 +726,38 @@ export async function compartirUbicacionWhatsApp({
   longitud,
   pedidoId = "",
 }) {
-  const mapsUrl =
-    `https://www.google.com/maps?q=` +
-    `${latitud},${longitud}`;
+  const latitudNumero =
+    Number(latitud);
 
-  const mensaje = encodeURIComponent(
-    `🛵 GasRuta - Ubicación del repartidor\n` +
-      `El pedido va en camino${
-        pedidoId
-          ? ` (Pedido #${pedidoId.slice(
-              0,
-              6
-            )})`
-          : ""
-      }.\n` +
-      `Ubicación:\n${mapsUrl}`
-  );
+  const longitudNumero =
+    Number(longitud);
+
+  if (
+    Number.isNaN(latitudNumero) ||
+    Number.isNaN(longitudNumero)
+  ) {
+    throw new Error(
+      "Las coordenadas no son válidas."
+    );
+  }
+
+  const mapsUrl =
+    "https://www.google.com/maps?q=" +
+    `${latitudNumero},${longitudNumero}`;
+
+  const mensaje =
+    encodeURIComponent(
+      "🛵 GasRuta - Ubicación del repartidor\n" +
+        `El pedido va en camino${
+          pedidoId
+            ? ` (Pedido #${pedidoId.slice(
+                0,
+                6
+              )})`
+            : ""
+        }.\n` +
+        `Ubicación:\n${mapsUrl}`
+    );
 
   const appUrl =
     `whatsapp://send?text=${mensaje}`;
@@ -678,7 +776,14 @@ export async function compartirUbicacionWhatsApp({
         ? appUrl
         : webUrl
     );
-  } catch {
-    return Linking.openURL(webUrl);
+  } catch (error) {
+    console.log(
+      "No se pudo abrir WhatsApp:",
+      error.message
+    );
+
+    return Linking.openURL(
+      webUrl
+    );
   }
 }
