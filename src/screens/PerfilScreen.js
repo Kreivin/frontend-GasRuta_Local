@@ -6,71 +6,248 @@ import React, {
 import {
   View,
   Text,
-  StyleSheet,
   TouchableOpacity,
-  ScrollView,
+  StyleSheet,
   Alert,
   ActivityIndicator,
+  Platform,
+  ScrollView,
 } from "react-native";
 
-import { Ionicons } from "@expo/vector-icons";
+import {
+  Ionicons,
+} from "@expo/vector-icons";
 
-import { AuthContext } from "../context/AuthContext";
+import {
+  AuthContext,
+} from "../context/AuthContext";
 
 export default function PerfilScreen({
   navigation,
-  route,
 }) {
-  const authContext = useContext(AuthContext);
+  const {
+    currentUser,
+    logout,
+  } = useContext(AuthContext);
 
-  const [cerrandoSesion, setCerrandoSesion] =
-    useState(false);
+  const [
+    cerrandoSesion,
+    setCerrandoSesion,
+  ] = useState(false);
 
-  /*
-   * Primero intenta obtener el usuario desde AuthContext.
-   * Si todavía no está guardado en el contexto, utiliza
-   * el usuario enviado mediante navigation.replace().
-   */
-  const usuario =
-    authContext?.currentUser ||
-    route?.params?.usuario ||
-    null;
+  const rol = String(
+    currentUser?.Rol || "Cliente"
+  ).trim();
 
-  const cerrarSesion = async () => {
-    try {
-      setCerrandoSesion(true);
+  const rolNormalizado =
+    rol.toLowerCase();
 
-      if (authContext?.logout) {
-        await authContext.logout();
+  const esAdministrador =
+    rolNormalizado ===
+      "administrador" ||
+    rolNormalizado === "admin";
+
+  const esRepartidor =
+    rolNormalizado ===
+    "repartidor";
+
+  // =========================
+  // Configuración visual
+  // =========================
+
+  const obtenerConfiguracionRol =
+    () => {
+      if (esAdministrador) {
+        return {
+          icono:
+            "shield-checkmark-outline",
+
+          color: "#FF6B00",
+
+          fondo: "#FFF3E8",
+
+          titulo:
+            "Perfil administrativo",
+
+          descripcion:
+            "Gestión y control de GasRuta Local",
+        };
       }
 
-      navigation.reset({
-        index: 0,
-        routes: [
-          {
-            name: "Login",
-          },
-        ],
-      });
-    } catch (error) {
-      console.log(
-        "Error al cerrar sesión:",
-        error.message
-      );
+      if (esRepartidor) {
+        return {
+          icono:
+            "bicycle-outline",
 
-      Alert.alert(
-        "Error",
-        "No fue posible cerrar la sesión."
-      );
-    } finally {
-      setCerrandoSesion(false);
+          color: "#1A73E8",
+
+          fondo: "#E8F0FE",
+
+          titulo:
+            "Perfil de repartidor",
+
+          descripcion:
+            "Gestión de recorridos y entregas",
+        };
+      }
+
+      return {
+        icono:
+          "person-outline",
+
+        color: "#2E9B59",
+
+        fondo: "#EAF8F0",
+
+        titulo:
+          "Perfil de cliente",
+
+        descripcion:
+          "Información de tu cuenta",
+      };
+    };
+
+  const configuracionRol =
+    obtenerConfiguracionRol();
+
+  // =========================
+  // Obtener iniciales
+  // =========================
+
+  const obtenerIniciales = () => {
+    const nombre = String(
+      currentUser?.Nombre || ""
+    ).trim();
+
+    if (!nombre) {
+      return "U";
     }
+
+    const palabras =
+      nombre.split(/\s+/);
+
+    if (palabras.length === 1) {
+      return palabras[0]
+        .charAt(0)
+        .toUpperCase();
+    }
+
+    return (
+      palabras[0]
+        .charAt(0)
+        .toUpperCase() +
+      palabras[1]
+        .charAt(0)
+        .toUpperCase()
+    );
   };
 
-  const confirmarCerrarSesion = () => {
+  // =========================
+  // Regresar al Login
+  // =========================
+
+  const regresarAlLogin = () => {
+    /*
+     * Buscamos el navegador principal.
+     *
+     * Perfil está dentro de Tabs y Tabs está
+     * dentro del Stack principal. Por eso no
+     * siempre basta con navigation.replace().
+     */
+    let navegadorRaiz =
+      navigation;
+
+    while (
+      navegadorRaiz.getParent?.()
+    ) {
+      navegadorRaiz =
+        navegadorRaiz.getParent();
+    }
+
+    navegadorRaiz.reset({
+      index: 0,
+      routes: [
+        {
+          name: "Login",
+        },
+      ],
+    });
+  };
+
+  // =========================
+  // Ejecutar cierre
+  // =========================
+
+  const ejecutarCierreSesion =
+    async () => {
+      if (cerrandoSesion) {
+        return;
+      }
+
+      try {
+        setCerrandoSesion(true);
+
+        /*
+         * AuthContext.logout debe ejecutar
+         * signOut(auth).
+         */
+        if (
+          typeof logout ===
+          "function"
+        ) {
+          await logout();
+        } else {
+          console.warn(
+            "AuthContext no tiene la función logout."
+          );
+        }
+
+        regresarAlLogin();
+      } catch (error) {
+        console.log(
+          "Error cerrando sesión:",
+          error
+        );
+
+        Alert.alert(
+          "No se pudo cerrar sesión",
+          error.message ||
+            "Ocurrió un error al cerrar la sesión."
+        );
+      } finally {
+        setCerrandoSesion(false);
+      }
+    };
+
+  // =========================
+  // Confirmar cierre
+  // =========================
+
+  const cerrarSesion = () => {
+    if (cerrandoSesion) {
+      return;
+    }
+
+    if (
+      Platform.OS === "web" &&
+      typeof window !==
+        "undefined"
+    ) {
+      const confirmado =
+        window.confirm(
+          "¿Deseas cerrar tu sesión?"
+        );
+
+      if (confirmado) {
+        ejecutarCierreSesion();
+      }
+
+      return;
+    }
+
     Alert.alert(
       "Cerrar sesión",
-      "¿Deseas cerrar tu sesión actual?",
+      "¿Deseas salir de tu cuenta?",
       [
         {
           text: "Cancelar",
@@ -79,524 +256,741 @@ export default function PerfilScreen({
         {
           text: "Cerrar sesión",
           style: "destructive",
-          onPress: cerrarSesion,
+          onPress:
+            ejecutarCierreSesion,
         },
-      ]
+      ],
+      {
+        cancelable: true,
+      }
     );
   };
 
-  // Si todavía no se ha cargado el perfil
-  if (!usuario) {
+  // =========================
+  // Sin información de cuenta
+  // =========================
+
+  if (!currentUser) {
     return (
       <View
         style={[
-          styles.contenedor,
-          styles.centrado,
+          styles.container,
+          styles.center,
         ]}
       >
-        <Ionicons
-          name="person-circle-outline"
-          size={80}
-          color="#B0B0B0"
-        />
+        <View
+          style={
+            styles.emptyIconContainer
+          }
+        >
+          <Ionicons
+            name="person-circle-outline"
+            size={64}
+            color="#999999"
+          />
+        </View>
 
-        <Text style={styles.sinPerfilTitulo}>
-          Perfil no disponible
+        <Text
+          style={styles.emptyTitle}
+        >
+          No hay una sesión activa
         </Text>
 
-        <Text style={styles.sinPerfilTexto}>
-          No se encontró la información de la
-          sesión actual.
+        <Text
+          style={styles.emptyText}
+        >
+          Inicia sesión para consultar
+          la información de tu cuenta.
         </Text>
 
         <TouchableOpacity
-          style={styles.botonVolverLogin}
-          onPress={() =>
-            navigation.reset({
-              index: 0,
-              routes: [
-                {
-                  name: "Login",
-                },
-              ],
-            })
-          }
+          style={styles.loginButton}
+          onPress={regresarAlLogin}
         >
-          <Text style={styles.textoBotonVolver}>
-            Volver al inicio de sesión
+          <Text
+            style={
+              styles.loginButtonText
+            }
+          >
+            Ir a iniciar sesión
           </Text>
         </TouchableOpacity>
       </View>
     );
   }
 
-  const inicialNombre =
-    usuario.Nombre?.trim()?.charAt(0)?.toUpperCase() ||
-    "U";
-
   return (
-    <ScrollView
-      style={styles.pantalla}
-      contentContainerStyle={styles.contenedor}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Encabezado del perfil */}
-      <View style={styles.headerCard}>
-        <View style={styles.avatarContainer}>
-          <Text style={styles.avatarTexto}>
-            {inicialNombre}
-          </Text>
-        </View>
-
-        <Text style={styles.titulo}>
-          {usuario.Nombre || "Usuario"}
-        </Text>
-
-        <View style={styles.rolBadge}>
-          <Ionicons
-            name="shield-checkmark-outline"
-            size={16}
-            color="#FF6B00"
-          />
-
-          <Text style={styles.rolBadgeTexto}>
-            {usuario.Rol || "Sin rol"}
-          </Text>
-        </View>
-
-        <Text style={styles.subtitulo}>
-          GasRuta Local
-        </Text>
-      </View>
-
-      {/* Información personal */}
-      <View style={styles.infoCard}>
-        <Text style={styles.seccionTitulo}>
-          Información personal
-        </Text>
-
-        <View style={styles.infoRow}>
-          <View style={styles.iconoContainer}>
-            <Ionicons
-              name="person-outline"
-              size={21}
-              color="#FF6B00"
-            />
-          </View>
-
-          <View style={styles.infoContenido}>
-            <Text style={styles.infoLabel}>
-              Nombre completo
-            </Text>
-
-            <Text style={styles.infoText}>
-              {usuario.Nombre || "No registrado"}
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.infoRow}>
-          <View style={styles.iconoContainer}>
-            <Ionicons
-              name="mail-outline"
-              size={21}
-              color="#FF6B00"
-            />
-          </View>
-
-          <View style={styles.infoContenido}>
-            <Text style={styles.infoLabel}>
-              Correo electrónico
-            </Text>
-
-            <Text style={styles.infoText}>
-              {usuario.Correo || "No registrado"}
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.infoRow}>
-          <View style={styles.iconoContainer}>
-            <Ionicons
-              name="call-outline"
-              size={21}
-              color="#FF6B00"
-            />
-          </View>
-
-          <View style={styles.infoContenido}>
-            <Text style={styles.infoLabel}>
-              Teléfono
-            </Text>
-
-            <Text style={styles.infoText}>
-              {usuario.Telefono || "No registrado"}
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.infoRow}>
-          <View style={styles.iconoContainer}>
-            <Ionicons
-              name="location-outline"
-              size={21}
-              color="#FF6B00"
-            />
-          </View>
-
-          <View style={styles.infoContenido}>
-            <Text style={styles.infoLabel}>
-              Dirección
-            </Text>
-
-            <Text style={styles.infoText}>
-              {usuario.Direccion || "No registrada"}
-            </Text>
-          </View>
-        </View>
-
+    <View style={styles.container}>
+      <ScrollView
+        contentContainerStyle={
+          styles.scrollContent
+        }
+        showsVerticalScrollIndicator={
+          false
+        }
+      >
+        {/* Encabezado */}
         <View
-          style={[
-            styles.infoRow,
-            styles.ultimaFila,
-          ]}
+          style={styles.headerCard}
         >
-          <View style={styles.iconoContainer}>
-            <Ionicons
-              name="key-outline"
-              size={21}
-              color="#FF6B00"
-            />
-          </View>
-
-          <View style={styles.infoContenido}>
-            <Text style={styles.infoLabel}>
-              Código de usuario
-            </Text>
-
-            <Text style={styles.infoText}>
-              {usuario.Usuariokey ||
-                "No registrado"}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Información de cuenta */}
-      <View style={styles.infoCard}>
-        <Text style={styles.seccionTitulo}>
-          Información de la cuenta
-        </Text>
-
-        <View style={styles.infoRow}>
-          <View style={styles.iconoContainer}>
-            <Ionicons
-              name="shield-outline"
-              size={21}
-              color="#FF6B00"
-            />
-          </View>
-
-          <View style={styles.infoContenido}>
-            <Text style={styles.infoLabel}>
-              Rol asignado
-            </Text>
-
-            <Text style={styles.infoText}>
-              {usuario.Rol || "Sin rol"}
-            </Text>
-          </View>
-        </View>
-
-        <View
-          style={[
-            styles.infoRow,
-            styles.ultimaFila,
-          ]}
-        >
-          <View style={styles.iconoContainer}>
+          <View
+            style={[
+              styles.roleIconContainer,
+              {
+                backgroundColor:
+                  configuracionRol.fondo,
+              },
+            ]}
+          >
             <Ionicons
               name={
-                usuario.activo === false
-                  ? "close-circle-outline"
-                  : "checkmark-circle-outline"
+                configuracionRol.icono
               }
-              size={21}
+              size={30}
               color={
-                usuario.activo === false
-                  ? "#D94A4A"
-                  : "#2E9B59"
+                configuracionRol.color
               }
             />
           </View>
 
-          <View style={styles.infoContenido}>
-            <Text style={styles.infoLabel}>
-              Estado
+          <Text
+            style={styles.roleTitle}
+          >
+            {configuracionRol.titulo}
+          </Text>
+
+          <Text
+            style={
+              styles.roleDescription
+            }
+          >
+            {
+              configuracionRol.descripcion
+            }
+          </Text>
+        </View>
+
+        {/* Información principal */}
+        <View style={styles.profileCard}>
+          <View
+            style={[
+              styles.avatarContainer,
+              {
+                backgroundColor:
+                  configuracionRol.fondo,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.avatarText,
+                {
+                  color:
+                    configuracionRol.color,
+                },
+              ]}
+            >
+              {obtenerIniciales()}
             </Text>
+          </View>
+
+          <Text style={styles.name}>
+            {currentUser.Nombre ||
+              "Usuario"}
+          </Text>
+
+          <Text style={styles.email}>
+            {currentUser.Correo ||
+              "Correo no disponible"}
+          </Text>
+
+          <View
+            style={[
+              styles.roleBadge,
+              {
+                backgroundColor:
+                  configuracionRol.fondo,
+              },
+            ]}
+          >
+            <Ionicons
+              name={
+                configuracionRol.icono
+              }
+              size={16}
+              color={
+                configuracionRol.color
+              }
+            />
 
             <Text
               style={[
-                styles.infoText,
-                usuario.activo === false
-                  ? styles.estadoInactivo
-                  : styles.estadoActivo,
+                styles.roleBadgeText,
+                {
+                  color:
+                    configuracionRol.color,
+                },
               ]}
             >
-              {usuario.activo === false
-                ? "Cuenta inactiva"
-                : "Cuenta activa"}
+              {rol}
             </Text>
           </View>
         </View>
-      </View>
 
-      {/* Botón de cerrar sesión */}
-      <TouchableOpacity
-        style={[
-          styles.botonCerrarSesion,
-          cerrandoSesion &&
-            styles.botonDeshabilitado,
-        ]}
-        onPress={confirmarCerrarSesion}
-        disabled={cerrandoSesion}
-        activeOpacity={0.8}
-      >
-        {cerrandoSesion ? (
-          <ActivityIndicator color="#D94A4A" />
-        ) : (
-          <>
+        {/* Datos de la cuenta */}
+        <View style={styles.infoCard}>
+          <Text
+            style={styles.sectionTitle}
+          >
+            INFORMACIÓN DE LA CUENTA
+          </Text>
+
+          <View style={styles.infoRow}>
+            <View
+              style={
+                styles.infoIconContainer
+              }
+            >
+              <Ionicons
+                name="person-outline"
+                size={20}
+                color="#FF6B00"
+              />
+            </View>
+
+            <View
+              style={styles.infoContent}
+            >
+              <Text
+                style={styles.infoLabel}
+              >
+                Nombre completo
+              </Text>
+
+              <Text
+                style={styles.infoValue}
+              >
+                {currentUser.Nombre ||
+                  "No disponible"}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.separator} />
+
+          <View style={styles.infoRow}>
+            <View
+              style={
+                styles.infoIconContainer
+              }
+            >
+              <Ionicons
+                name="mail-outline"
+                size={20}
+                color="#FF6B00"
+              />
+            </View>
+
+            <View
+              style={styles.infoContent}
+            >
+              <Text
+                style={styles.infoLabel}
+              >
+                Correo electrónico
+              </Text>
+
+              <Text
+                style={styles.infoValue}
+              >
+                {currentUser.Correo ||
+                  "No disponible"}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.separator} />
+
+          <View style={styles.infoRow}>
+            <View
+              style={
+                styles.infoIconContainer
+              }
+            >
+              <Ionicons
+                name="call-outline"
+                size={20}
+                color="#FF6B00"
+              />
+            </View>
+
+            <View
+              style={styles.infoContent}
+            >
+              <Text
+                style={styles.infoLabel}
+              >
+                Teléfono
+              </Text>
+
+              <Text
+                style={styles.infoValue}
+              >
+                {currentUser.Telefono ||
+                  "Sin teléfono"}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.separator} />
+
+          <View style={styles.infoRow}>
+            <View
+              style={
+                styles.infoIconContainer
+              }
+            >
+              <Ionicons
+                name="location-outline"
+                size={20}
+                color="#FF6B00"
+              />
+            </View>
+
+            <View
+              style={styles.infoContent}
+            >
+              <Text
+                style={styles.infoLabel}
+              >
+                Dirección
+              </Text>
+
+              <Text
+                style={styles.infoValue}
+              >
+                {currentUser.Direccion ||
+                  "Sin dirección registrada"}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.separator} />
+
+          <View style={styles.infoRow}>
+            <View
+              style={
+                styles.infoIconContainer
+              }
+            >
+              <Ionicons
+                name="finger-print-outline"
+                size={20}
+                color="#FF6B00"
+              />
+            </View>
+
+            <View
+              style={styles.infoContent}
+            >
+              <Text
+                style={styles.infoLabel}
+              >
+                Código de usuario
+              </Text>
+
+              <Text
+                style={styles.infoValue}
+              >
+                {currentUser.Usuariokey ||
+                  currentUser.id ||
+                  currentUser.uid ||
+                  "No disponible"}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Sección administrativa */}
+        {esAdministrador ? (
+          <View
+            style={
+              styles.adminInformation
+            }
+          >
             <Ionicons
-              name="log-out-outline"
-              size={22}
-              color="#D94A4A"
+              name="shield-checkmark-outline"
+              size={24}
+              color="#FF6B00"
             />
 
-            <Text style={styles.textoCerrarSesion}>
-              Cerrar sesión
-            </Text>
-          </>
-        )}
-      </TouchableOpacity>
+            <View style={{ flex: 1 }}>
+              <Text
+                style={
+                  styles.adminInformationTitle
+                }
+              >
+                Cuenta administrativa
+              </Text>
 
-      <Text style={styles.versionTexto}>
-        GasRuta Local
-      </Text>
-    </ScrollView>
+              <Text
+                style={
+                  styles.adminInformationText
+                }
+              >
+                Esta cuenta tiene acceso
+                al panel de administración,
+                usuarios, pedidos, rutas e
+                incidencias.
+              </Text>
+            </View>
+          </View>
+        ) : null}
+
+        {/* Seguridad */}
+        <View style={styles.securityCard}>
+          <Ionicons
+            name="shield-checkmark-outline"
+            size={22}
+            color="#2E9B59"
+          />
+
+          <View style={{ flex: 1 }}>
+            <Text
+              style={
+                styles.securityTitle
+              }
+            >
+              Sesión protegida
+            </Text>
+
+            <Text
+              style={
+                styles.securityText
+              }
+            >
+              La autenticación de la cuenta
+              es administrada de forma
+              segura por Firebase
+              Authentication.
+            </Text>
+          </View>
+        </View>
+
+        {/* Cerrar sesión */}
+        <TouchableOpacity
+          style={[
+            styles.logoutButton,
+            cerrandoSesion &&
+              styles.disabledButton,
+          ]}
+          onPress={cerrarSesion}
+          disabled={cerrandoSesion}
+          activeOpacity={0.8}
+        >
+          {cerrandoSesion ? (
+            <ActivityIndicator
+              color="#FFFFFF"
+            />
+          ) : (
+            <>
+              <Ionicons
+                name="log-out-outline"
+                size={21}
+                color="#FFFFFF"
+              />
+
+              <Text
+                style={
+                  styles.logoutButtonText
+                }
+              >
+                Cerrar sesión
+              </Text>
+            </>
+          )}
+        </TouchableOpacity>
+
+        <Text style={styles.versionText}>
+          GasRuta Local
+        </Text>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  pantalla: {
+  container: {
     flex: 1,
-    backgroundColor: "#F8F9FA",
+    backgroundColor: "#F4F5F8",
   },
 
-  contenedor: {
-    flexGrow: 1,
-    backgroundColor: "#F8F9FA",
-    padding: 20,
+  center: {
+    justifyContent: "center",
     alignItems: "center",
+    paddingHorizontal: 25,
+  },
+
+  scrollContent: {
+    padding: 20,
+    paddingTop: 45,
     paddingBottom: 40,
   },
 
-  centrado: {
-    justifyContent: "center",
+  headerCard: {
+    backgroundColor: "#1F1B2E",
+    borderRadius: 22,
+    padding: 22,
+    alignItems: "center",
+    marginBottom: 16,
   },
 
-  headerCard: {
-    width: "100%",
+  roleIconContainer: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 13,
+  },
+
+  roleTitle: {
+    color: "#FFFFFF",
+    fontSize: 22,
+    fontWeight: "800",
+    textAlign: "center",
+  },
+
+  roleDescription: {
+    color: "#C8C3D3",
+    fontSize: 13,
+    textAlign: "center",
+    marginTop: 5,
+  },
+
+  profileCard: {
     backgroundColor: "#FFFFFF",
     borderRadius: 20,
-    padding: 25,
+    borderWidth: 1,
+    borderColor: "#E7E7EB",
+    padding: 22,
     alignItems: "center",
-    marginTop: 25,
-
-    shadowColor: "#000000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    marginBottom: 16,
   },
 
   avatarContainer: {
-    width: 92,
-    height: 92,
-    borderRadius: 46,
-    backgroundColor: "#FFF3ED",
+    width: 88,
+    height: 88,
+    borderRadius: 44,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 15,
-    borderWidth: 2,
-    borderColor: "#FFD4B8",
+    marginBottom: 13,
   },
 
-  avatarTexto: {
-    color: "#FF6B00",
-    fontSize: 40,
-    fontWeight: "800",
+  avatarText: {
+    fontSize: 31,
+    fontWeight: "900",
   },
 
-  titulo: {
-    fontSize: 23,
+  name: {
+    color: "#222222",
+    fontSize: 21,
     fontWeight: "800",
-    color: "#333333",
-    marginBottom: 8,
     textAlign: "center",
   },
 
-  rolBadge: {
+  email: {
+    color: "#777777",
+    fontSize: 13,
+    textAlign: "center",
+    marginTop: 5,
+  },
+
+  roleBadge: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFF3ED",
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    marginBottom: 8,
+    paddingVertical: 7,
+    borderRadius: 12,
+    marginTop: 13,
     gap: 5,
   },
 
-  rolBadgeTexto: {
-    fontSize: 13,
-    color: "#FF6B00",
-    fontWeight: "700",
-  },
-
-  subtitulo: {
-    fontSize: 14,
-    color: "#777777",
-    textAlign: "center",
+  roleBadgeText: {
+    fontSize: 12,
+    fontWeight: "800",
+    textTransform: "uppercase",
   },
 
   infoCard: {
-    width: "100%",
     backgroundColor: "#FFFFFF",
     borderRadius: 20,
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    marginTop: 18,
-
-    shadowColor: "#000000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: "#E7E7EB",
+    padding: 18,
+    marginBottom: 16,
   },
 
-  seccionTitulo: {
-    color: "#333333",
-    fontSize: 16,
+  sectionTitle: {
+    color: "#888888",
+    fontSize: 12,
     fontWeight: "800",
-    marginBottom: 8,
+    letterSpacing: 0.5,
+    marginBottom: 14,
   },
 
   infoRow: {
-    width: "100%",
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
+    paddingVertical: 8,
   },
 
-  ultimaFila: {
-    borderBottomWidth: 0,
-  },
-
-  iconoContainer: {
+  infoIconContainer: {
     width: 42,
     height: 42,
     borderRadius: 13,
-    backgroundColor: "#FFF3ED",
+    backgroundColor: "#FFF3E8",
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 13,
+    marginRight: 12,
   },
 
-  infoContenido: {
+  infoContent: {
     flex: 1,
   },
 
   infoLabel: {
     color: "#888888",
-    fontSize: 12,
+    fontSize: 11,
     marginBottom: 3,
   },
 
-  infoText: {
-    fontSize: 15,
+  infoValue: {
     color: "#333333",
-    fontWeight: "600",
-  },
-
-  estadoActivo: {
-    color: "#2E9B59",
-  },
-
-  estadoInactivo: {
-    color: "#D94A4A",
-  },
-
-  botonCerrarSesion: {
-    width: "100%",
-    minHeight: 56,
-    marginTop: 24,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#F2B8B8",
-    backgroundColor: "#FFF5F5",
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 10,
-  },
-
-  botonDeshabilitado: {
-    opacity: 0.6,
-  },
-
-  textoCerrarSesion: {
-    color: "#D94A4A",
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "700",
   },
 
-  versionTexto: {
-    color: "#AAAAAA",
-    fontSize: 12,
-    marginTop: 20,
+  separator: {
+    height: 1,
+    backgroundColor: "#EEEEEE",
+    marginVertical: 3,
   },
 
-  sinPerfilTitulo: {
-    color: "#333333",
-    fontSize: 21,
+  adminInformation: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: "#FFF3E8",
+    borderWidth: 1,
+    borderColor: "#FFD8B5",
+    borderRadius: 16,
+    padding: 15,
+    marginBottom: 16,
+    gap: 10,
+  },
+
+  adminInformationTitle: {
+    color: "#9A4D00",
+    fontSize: 14,
     fontWeight: "800",
-    marginTop: 15,
   },
 
-  sinPerfilTexto: {
+  adminInformationText: {
+    color: "#8A6542",
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 4,
+  },
+
+  securityCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: "#EEFAF2",
+    borderWidth: 1,
+    borderColor: "#CAEBD5",
+    borderRadius: 16,
+    padding: 15,
+    marginBottom: 18,
+    gap: 10,
+  },
+
+  securityTitle: {
+    color: "#2E6B45",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+
+  securityText: {
+    color: "#487458",
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 3,
+  },
+
+  logoutButton: {
+    minHeight: 57,
+    backgroundColor: "#D9534F",
+    borderRadius: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+
+  logoutButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "800",
+  },
+
+  disabledButton: {
+    opacity: 0.6,
+  },
+
+  versionText: {
+    color: "#AAAAAA",
+    fontSize: 11,
+    textAlign: "center",
+    marginTop: 18,
+  },
+
+  emptyIconContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: "#EEEEEE",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  emptyTitle: {
+    color: "#333333",
+    fontSize: 20,
+    fontWeight: "800",
+    marginTop: 17,
+  },
+
+  emptyText: {
     color: "#777777",
     fontSize: 14,
+    lineHeight: 20,
     textAlign: "center",
-    marginTop: 8,
-    marginBottom: 20,
+    marginTop: 7,
   },
 
-  botonVolverLogin: {
+  loginButton: {
+    minHeight: 52,
     backgroundColor: "#FF6B00",
     borderRadius: 15,
-    paddingHorizontal: 20,
-    paddingVertical: 14,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 24,
+    marginTop: 22,
   },
 
-  textoBotonVolver: {
+  loginButtonText: {
     color: "#FFFFFF",
+    fontSize: 15,
     fontWeight: "700",
   },
 });

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useContext } from "react";
 import { StyleSheet, View, Platform, Image } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { NavigationContainer } from "@react-navigation/native";
@@ -16,12 +16,11 @@ import IncidenciaScreen from "./src/screens/IncidenciaScreen";
 import VistaAdminScreen from "./src/screens/VistaAdminScreen";
 import NuevoProductoScreen from "./src/screens/NuevoProductoScreen";
 import PerfilScreen from "./src/screens/PerfilScreen";
-import PerfilAdminScreen from "./src/screens/PerfilAdminScreen";
 import MapaSeguimientoScreen from "./src/screens/MapaSeguimientoScreen";
 import RegisterScreen from "./src/screens/RegisterScreen";
 import MisPedidosScreen from "./src/screens/MisPedidosScreen";
 
-import { AuthProvider } from "./src/context/AuthContext";
+import { AuthProvider, AuthContext } from "./src/context/AuthContext";
 import { CartProvider } from "./src/context/CartContext";
 import { ProductProvider } from "./src/context/ProductContext";
 import { PedidoProvider } from "./src/context/PedidoContext";
@@ -55,90 +54,270 @@ function AdminStack() {
       {/* Pantalla de perfil del administrador con opción de cerrar sesión */}
       <Stack.Screen
         name="PerfilAdmin"
-        component={PerfilAdminScreen}
+        component={PerfilScreen}
       />
     </Stack.Navigator>
   );
 }
 
 function MainTabs() {
+  const {
+    currentUser,
+  } = useContext(AuthContext);
+
+  const rol = String(
+    currentUser?.Rol || ""
+  )
+    .trim()
+    .toLowerCase();
+
+  const opcionesTabs = {
+    headerShown: false,
+
+    tabBarActiveTintColor:
+      "#FF6B00",
+
+    tabBarInactiveTintColor:
+      "#888888",
+
+    tabBarStyle: {
+      height: 64,
+      paddingTop: 6,
+      paddingBottom: 7,
+      backgroundColor: "#FFFFFF",
+      borderTopColor: "#E7E7E7",
+      borderTopWidth: 1,
+    },
+
+    tabBarLabelStyle: {
+      fontSize: 10,
+      fontWeight: "600",
+    },
+  };
+
+  // =========================
+  // Navegación del cliente
+  // =========================
+
+  if (rol === "cliente") {
+    return (
+      <Tab.Navigator
+        initialRouteName="Catalogo"
+        screenOptions={opcionesTabs}
+      >
+        <Tab.Screen
+          name="Catalogo"
+          component={HomeScreen}
+          options={{
+            title: "Catálogo",
+
+            tabBarIcon: ({
+              color,
+              size,
+            }) => (
+              <Ionicons
+                name="flame-outline"
+                color={color}
+                size={size}
+              />
+            ),
+          }}
+        />
+
+        <Tab.Screen
+          name="MisPedidos"
+          component={MisPedidosScreen}
+          options={{
+            title: "Pedidos",
+
+            tabBarIcon: ({
+              color,
+              size,
+            }) => (
+              <Ionicons
+                name="receipt-outline"
+                color={color}
+                size={size}
+              />
+            ),
+          }}
+        />
+
+        <Tab.Screen
+          name="Rutas"
+          component={RutaScreen}
+          options={{
+            title: "Rutas",
+
+            tabBarIcon: ({
+              color,
+              size,
+            }) => (
+              <Ionicons
+                name="map-outline"
+                color={color}
+                size={size}
+              />
+            ),
+          }}
+        />
+
+        <Tab.Screen
+          name="ResenasTab"
+          component={ResenaScreen}
+          options={{
+            title: "Reseñas",
+
+            tabBarIcon: ({
+              color,
+              size,
+            }) => (
+              <Ionicons
+                name="chatbubble-ellipses-outline"
+                color={color}
+                size={size}
+              />
+            ),
+          }}
+        />
+
+        <Tab.Screen
+          name="Perfil"
+          component={PerfilScreen}
+          options={{
+            title: "Perfil",
+
+            tabBarIcon: ({
+              color,
+              size,
+            }) => (
+              <Ionicons
+                name="person-outline"
+                color={color}
+                size={size}
+              />
+            ),
+          }}
+        />
+      </Tab.Navigator>
+    );
+  }
+
+  // =========================
+  // Navegación del repartidor
+  // =========================
+
+  if (rol === "repartidor") {
+    return (
+      <Tab.Navigator
+        initialRouteName="Rutas"
+        screenOptions={opcionesTabs}
+      >
+        <Tab.Screen
+          name="Rutas"
+          component={RutaScreen}
+          options={{
+            title: "Rutas",
+
+            tabBarIcon: ({
+              color,
+              size,
+            }) => (
+              <Ionicons
+                name="map-outline"
+                color={color}
+                size={size}
+              />
+            ),
+          }}
+        />
+
+        <Tab.Screen
+          name="IncidenciasTab"
+          component={IncidenciaScreen}
+          options={{
+            title: "Incidencias",
+
+            tabBarIcon: ({
+              color,
+              size,
+            }) => (
+              <Ionicons
+                name="warning-outline"
+                color={color}
+                size={size}
+              />
+            ),
+          }}
+        />
+
+        <Tab.Screen
+          name="ResenasRepartidor"
+          component={ResenaScreen}
+          options={{
+            title: "Reseñas",
+
+            tabBarIcon: ({
+              color,
+              size,
+            }) => (
+              <Ionicons
+                name="chatbubble-ellipses-outline"
+                color={color}
+                size={size}
+              />
+            ),
+          }}
+        />
+
+        <Tab.Screen
+          name="PerfilRepartidor"
+          component={PerfilScreen}
+          options={{
+            title: "Perfil",
+
+            tabBarIcon: ({
+              color,
+              size,
+            }) => (
+              <Ionicons
+                name="person-outline"
+                color={color}
+                size={size}
+              />
+            ),
+          }}
+        />
+      </Tab.Navigator>
+    );
+  }
+
+  // =========================
+  // Navegación del administrador
+  // =========================
+
+  
+if (
+  rol === "administrador" ||
+  rol === "admin"
+) {
   return (
     <Tab.Navigator
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: "#FF6B00",
-        tabBarInactiveTintColor: "#888",
-      }}
+      initialRouteName="Administracion"
+      screenOptions={opcionesTabs}
     >
       <Tab.Screen
-        name="Catálogo"
-        component={HomeScreen}
+        name="Administracion"
+        component={AdminStack}
         options={{
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons
-              name={focused ? "flame" : "flame-outline"}
-              size={size || 24}
-              color={focused ? "#FF6B00" : color}
-            />
-          ),
-        }}
-      />
-
-      <Tab.Screen
-        name="Rutas"
-        component={RutaScreen}
-        options={{
-          tabBarIcon: ({ size, color, focused }) => (
-            <Ionicons
-              name={focused ? "map" : "map-outline"}
-              size={size || 24}
-              color={color}
-            />
-          ),
-        }}
-      />
-
-      <Tab.Screen
-        name="Reseñas"
-        component={ResenaScreen}
-        options={{
-          tabBarIcon: ({ size, color, focused }) => (
-            <Ionicons
-              name={focused ? "chatbubble-ellipses" : "chatbubble-ellipses-outline"}
-              size={size || 24}
-              color={color}
-            />
-          ),
-        }}
-      />
-
-      {/* Pestaña de Mi Perfil para el cliente / repartidor */}
-      <Tab.Screen
-        name="Perfil"
-        component={PerfilScreen}
-        options={{
-          tabBarIcon: ({ size, color, focused }) => (
-            <Ionicons
-              name={focused ? "person" : "person-outline"}
-              size={size || 24}
-              color={color}
-            />
-          ),
-        }}
-      />
-
-      <Tab.Screen
-        name="MisPedidos"
-        component={MisPedidosScreen}
-        options={{
-          title: "Mis pedidos",
+          title: "Panel",
 
           tabBarIcon: ({
             color,
             size,
           }) => (
             <Ionicons
-              name="receipt-outline"
+              name="grid-outline"
               color={color}
               size={size}
             />
@@ -147,25 +326,118 @@ function MainTabs() {
       />
 
       <Tab.Screen
-        name="Admin"
-        component={AdminStack}
-        options={({ route }) => {
-          const routeName = route.state?.routes[route.state.index]?.name;
-          const isHidden = routeName === "NuevoProducto";
-          return {
-            tabBarStyle: isHidden ? { display: "none" } : undefined,
-            tabBarIcon: ({ size, color, focused }) => (
-              <Ionicons
-                name={focused ? "settings" : "settings-outline"}
-                size={size || 24}
-                color={color}
-              />
-            ),
-          };
+        name="RutasAdmin"
+        component={RutaScreen}
+        options={{
+          title: "Rutas",
+
+          tabBarIcon: ({
+            color,
+            size,
+          }) => (
+            <Ionicons
+              name="map-outline"
+              color={color}
+              size={size}
+            />
+          ),
         }}
       />
+
+      <Tab.Screen
+        name="IncidenciasAdminTab"
+        component={IncidenciaScreen}
+        options={{
+          title: "Incidencias",
+
+          tabBarIcon: ({
+            color,
+            size,
+          }) => (
+            <Ionicons
+              name="warning-outline"
+              color={color}
+              size={size}
+            />
+          ),
+        }}
+      />
+
+      <Tab.Screen
+        name="ResenasAdmin"
+        component={ResenaScreen}
+        options={{
+          title: "Reseñas",
+
+          tabBarIcon: ({
+            color,
+            size,
+          }) => (
+            <Ionicons
+              name="chatbubble-ellipses-outline"
+              color={color}
+              size={size}
+            />
+          ),
+        }}
+      />
+
+     <Tab.Screen
+  name="PerfilAdministrador"
+  component={PerfilScreen}
+  options={{
+    title: "Perfil",
+
+    tabBarIcon: ({
+      color,
+      size,
+    }) => (
+      <Ionicons
+        name="person-circle-outline"
+        color={color}
+        size={size}
+      />
+    ),
+  }}
+/>
     </Tab.Navigator>
   );
+}
+
+// =========================
+// Rol desconocido
+// =========================
+//
+// Un rol desconocido no debe recibir
+// Administración por defecto.
+// Solo se muestra Perfil.
+// =========================
+
+return (
+  <Tab.Navigator
+    initialRouteName="PerfilSinRol"
+    screenOptions={opcionesTabs}
+  >
+    <Tab.Screen
+      name="PerfilSinRol"
+      component={PerfilScreen}
+      options={{
+        title: "Perfil",
+
+        tabBarIcon: ({
+          color,
+          size,
+        }) => (
+          <Ionicons
+            name="person-circle-outline"
+            color={color}
+            size={size}
+          />
+        ),
+      }}
+    />
+  </Tab.Navigator>
+);
 }
 
 export default function App() {
@@ -182,6 +454,7 @@ export default function App() {
                       <ProductProvider>
                         <NavigationContainer>
                           <Stack.Navigator
+                            initialRouteName="Login"
                             screenOptions={{
                               headerShown: false,
                             }}
